@@ -1,15 +1,16 @@
 import { EventBus } from '../EventBus';
 import { Scene } from 'phaser';
 
-export class Game extends Scene
-{
+export class Game extends Scene {
     camera: Phaser.Cameras.Scene2D.Camera;
-    background: Phaser.GameObjects.Image;
-    gameText: Phaser.GameObjects.Text;
+    player: Phaser.GameObjects.Image;
+    playerSpeed: number;  // Speed at which the player moves
+    targetPosition: Phaser.Math.Vector2 | null; // Target position to move towards
 
-    constructor ()
-    {
+    constructor() {
         super('Game');
+        this.playerSpeed = 200;  // Set player speed (adjust as necessary)
+        this.targetPosition = null; // Initially, no target position
     }
 
     create() {
@@ -43,15 +44,29 @@ export class Game extends Scene
         const centerY = screenHeight / 2;
 
         // Add the player image in the middle of the screen
-        const player = this.add.image(centerX, centerY, 'gast').setDisplaySize(rectSize, rectSize);
+        this.player = this.add.image(centerX, centerY, 'gast').setDisplaySize(rectSize, rectSize);
+
+        // Add input listener for mouse click or touch
+        this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+            this.targetPosition = new Phaser.Math.Vector2(pointer.x, pointer.y);
+        });
 
         EventBus.emit('current-scene-ready', this);
     }
 
+    override update(time: number, delta: number) {
+        if (this.targetPosition) {
+            const direction = this.targetPosition.clone().subtract(this.player.getCenter());
+            const distance = direction.length();
 
-
-    changeScene ()
-    {
-        this.scene.start('GameOver');
+            if (distance > this.playerSpeed * delta / 1000) {  // If the distance is greater than the step size
+                direction.normalize();
+                this.player.x += direction.x * this.playerSpeed * delta / 1000;
+                this.player.y += direction.y * this.playerSpeed * delta / 1000;
+            } else {
+                this.player.setPosition(this.targetPosition.x, this.targetPosition.y);
+                this.targetPosition = null;  // Stop moving
+            }
+        }
     }
 }
