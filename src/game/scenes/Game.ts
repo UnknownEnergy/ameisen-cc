@@ -19,30 +19,35 @@ export class Game extends Scene
         const graphics = this.add.graphics();
 
         // Define the dimensions for the grid
-        const rows = 100; // Number of rows
-        const cols = 100; // Number of columns
         const rectSize = 50; // Width and height of each rectangle
 
-        // Define colors for water and grass
-        const colors = {
-            water: 0x0000ff, // Blue for water
-            grass: 0x00ff00  // Green for grass
-        };
+        // Parse the CSV data
+        const mapData = this.cache.text.get('map');
+        const rows = mapData.trim().split('\n').map((row: string) => row.split(','));
 
-        // Create grid of rectangles
-        for (let row = 0; row < rows; row++) {
-            for (let col = 0; col < cols; col++) {
-                const x = col * rectSize;
-                const y = row * rectSize;
-                const color = (row + col) % 2 === 0 ? colors.water : colors.grass; // Alternate between water and grass
+        // Create grid of rectangles using images
+        rows.forEach((row: any[], rowIndex: number) => {
+            row.forEach((cell, colIndex) => {
+                const x = colIndex * rectSize;
+                const y = rowIndex * rectSize;
+                const texture = cell === '1' ? 'water' : 'grass'; // 1 for water, 0 for grass
 
-                graphics.fillStyle(color, 1.0);
-                graphics.fillRect(x, y, rectSize, rectSize);
-            }
-        }
+                this.add.image(x + rectSize / 2, y + rectSize / 2, texture).setDisplaySize(rectSize, rectSize);
+            });
+        });
+
+        // Get the center position of the screen
+        const screenWidth = this.cameras.main.width;
+        const screenHeight = this.cameras.main.height;
+        const centerX = screenWidth / 2;
+        const centerY = screenHeight / 2;
+
+        // Add the player image in the middle of the screen
+        const player = this.add.image(centerX, centerY, 'gast').setDisplaySize(rectSize, rectSize);
 
         EventBus.emit('current-scene-ready', this);
     }
+
 
 
     changeScene ()
