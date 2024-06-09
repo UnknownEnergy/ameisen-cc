@@ -12,22 +12,38 @@ export class Game extends Scene
         super('Game');
     }
 
-    create ()
-    {
+    create() {
         this.camera = this.cameras.main;
         this.camera.setBackgroundColor(0x00ff00);
 
-        this.background = this.add.image(512, 384, 'background');
-        this.background.setAlpha(0.5);
+        const graphics = this.add.graphics();
 
-        this.gameText = this.add.text(512, 384, 'Make something fun!\nand share it with us:\nsupport@phaser.io', {
-            fontFamily: 'Arial Black', fontSize: 38, color: '#ffffff',
-            stroke: '#000000', strokeThickness: 8,
-            align: 'center'
-        }).setOrigin(0.5).setDepth(100);
+        // Define the dimensions for the grid
+        const rows = 100; // Number of rows
+        const cols = 100; // Number of columns
+        const rectSize = 50; // Width and height of each rectangle
+
+        // Define colors for water and grass
+        const colors = {
+            water: 0x0000ff, // Blue for water
+            grass: 0x00ff00  // Green for grass
+        };
+
+        // Create grid of rectangles
+        for (let row = 0; row < rows; row++) {
+            for (let col = 0; col < cols; col++) {
+                const x = col * rectSize;
+                const y = row * rectSize;
+                const color = (row + col) % 2 === 0 ? colors.water : colors.grass; // Alternate between water and grass
+
+                graphics.fillStyle(color, 1.0);
+                graphics.fillRect(x, y, rectSize, rectSize);
+            }
+        }
 
         EventBus.emit('current-scene-ready', this);
     }
+
 
     changeScene ()
     {
