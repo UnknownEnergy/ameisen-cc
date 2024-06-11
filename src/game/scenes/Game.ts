@@ -25,28 +25,35 @@ export class Game extends Scene {
         const mapData = this.cache.text.get('map');
         this.mapData = mapData.trim().split('\n').map((row: string) => row.split(','));
 
+        // Initialize player spawn position
+        let playerSpawnX = 0;
+        let playerSpawnY = 0;
+
         // Create grid of rectangles using images
         this.mapData.forEach((row: any[], rowIndex: number) => {
             row.forEach((cell, colIndex) => {
                 const x = colIndex * this.gridSize;
                 const y = rowIndex * this.gridSize;
-                const texture = cell === '1' ? 'water' : 'grass';
+                const texture = cell === '0' ? 'water' : 'grass';
 
                 this.add.image(x + this.gridSize / 2, y + this.gridSize / 2, texture).setDisplaySize(this.gridSize, this.gridSize);
+
+                // Check if the cell is '2' (player spawn position)
+                if (cell === '2') {
+                    playerSpawnX = x + this.gridSize / 2;
+                    playerSpawnY = y + this.gridSize / 2;
+                }
             });
         });
 
-        // Get the center position of the screen
-        const screenWidth = this.cameras.main.width;
-        const screenHeight = this.cameras.main.height;
-        const centerX = screenWidth / 2;
-        const centerY = screenHeight / 2;
-
-        // Add the player image in the middle of the screen
-        this.player = this.add.image(centerX, centerY, 'gast')
+        // Add the player image at the spawn position
+        this.player = this.add.image(playerSpawnX, playerSpawnY, 'gast')
             .setDisplaySize(this.gridSize, this.gridSize)
             .setDepth(1)  // Ensure the player is above other tiles
             .setOrigin(0.5, 1);
+
+        // Center the camera on the player initially
+        this.camera.centerOn(playerSpawnX, playerSpawnY);
 
         // Add input listener for mouse click or touch
         this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
@@ -61,7 +68,7 @@ export class Game extends Scene {
         const row = Math.floor(y / this.gridSize);
 
         if (row >= 0 && row < this.mapData.length && col >= 0 && col < this.mapData[row].length) {
-            return this.mapData[row][col] === '1'; // '1' indicates a water tile
+            return this.mapData[row][col] === '0'; // '0' indicates a water tile
         }
 
         return false;
@@ -93,4 +100,5 @@ export class Game extends Scene {
             }
         }
     }
+
 }
