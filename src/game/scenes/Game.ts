@@ -4,14 +4,14 @@ import { Scene } from 'phaser';
 export class Game extends Scene {
     camera: Phaser.Cameras.Scene2D.Camera;
     player: Phaser.GameObjects.Image;
-    playerSpeed: number;  // Speed at which the player moves
+    playerSpeed: number;  // Speed at which the world moves
     targetPosition: Phaser.Math.Vector2 | null; // Target position to move towards
     mapData: string[][];
     gridSize: number;
 
     constructor() {
         super('Game');
-        this.playerSpeed = 200;  // Set player speed (adjust as necessary)
+        this.playerSpeed = 800;  // Set player speed (adjust as necessary)
         this.targetPosition = null; // Initially, no target position
         this.gridSize = 50; // Size of each grid cell
     }
@@ -29,7 +29,7 @@ export class Game extends Scene {
             row.forEach((cell, colIndex) => {
                 const x = colIndex * this.gridSize;
                 const y = rowIndex * this.gridSize;
-                const texture = cell === '1' ? 'water' : 'grass'; // 1 for water, 0 for grass
+                const texture = cell === '1' ? 'water' : 'grass';
 
                 this.add.image(x + this.gridSize / 2, y + this.gridSize / 2, texture).setDisplaySize(this.gridSize, this.gridSize);
             });
@@ -44,11 +44,12 @@ export class Game extends Scene {
         // Add the player image in the middle of the screen
         this.player = this.add.image(centerX, centerY, 'gast')
             .setDisplaySize(this.gridSize, this.gridSize)
-            .setOrigin(0.5, 1); // Set the origin to the bottom center
+            .setDepth(1)  // Ensure the player is above other tiles
+            .setOrigin(0.5, 1);
 
         // Add input listener for mouse click or touch
         this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
-            this.targetPosition = new Phaser.Math.Vector2(pointer.x, pointer.y);
+            this.targetPosition = new Phaser.Math.Vector2(pointer.worldX, pointer.worldY);
         });
 
         EventBus.emit('current-scene-ready', this);
@@ -67,21 +68,26 @@ export class Game extends Scene {
 
     override update(time: number, delta: number) {
         if (this.targetPosition) {
-            const direction = this.targetPosition.clone().subtract(this.player.getBottomCenter());
+            const direction = this.targetPosition.clone().subtract(new Phaser.Math.Vector2(this.player.x, this.player.y));
             const distance = direction.length();
 
             if (distance > this.playerSpeed * delta / 1000) {  // If the distance is greater than the step size
                 direction.normalize();
-                const nextX = this.player.x + direction.x * this.playerSpeed * delta / 1000;
-                const nextY = this.player.y + direction.y * this.playerSpeed * delta / 1000;
+                const offsetX = direction.x * this.playerSpeed * delta / 1000;
+                const offsetY = direction.y * this.playerSpeed * delta / 1000;
 
-                // Check for collision with water at the bottom center of the player
-                if (!this.isCollidable(nextX, nextY)) {
-                    this.player.x = nextX;
-                    this.player.y = nextY;
+                const nextPlayerX = this.player.x + offsetX;
+                const nextPlayerY = this.player.y + offsetY;
+
+                // Check for collision with water at the player's next position
+                if (!this.isCollidable(nextPlayerX, nextPlayerY)) {
+                    this.player.x = nextPlayerX;
+                    this.player.y = nextPlayerY;
+
+                    // Update camera to follow the player
+                    this.camera.centerOn(nextPlayerX, nextPlayerY);
                 }
             } else {
-                this.player.setPosition(this.targetPosition.x, this.targetPosition.y);
                 this.targetPosition = null;  // Stop moving
             }
         }
