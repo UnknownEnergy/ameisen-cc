@@ -18,7 +18,8 @@ export class Game extends Scene {
 
     create() {
         this.camera = this.cameras.main;
-        this.camera.setBackgroundColor(0x00ff00);
+        this.camera.setBackgroundColor(0x000000);
+        this.camera.setZoom(2);  // Set the zoom level to 2x
 
         // Parse the CSV data
         const mapData = this.cache.text.get('map');

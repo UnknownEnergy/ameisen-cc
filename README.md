@@ -2,8 +2,7 @@
 
 This is an open-source game inspired by an old game called ameisen.cc
 
-
-![screenshot](screenshot.png)
+![ameisenLogo.gif](src%2Fassets%2FameisenLogo.gif)
 
 ## Requirements
 
