@@ -8,6 +8,8 @@ export class Game extends Scene {
     targetPosition: Phaser.Math.Vector2 | null; // Target position to move towards
     mapData: string[][];
     gridSize: number;
+    minimap: Phaser.Cameras.Scene2D.Camera;
+    minimapGraphics: Phaser.GameObjects.Graphics;
 
     constructor() {
         super('Game');
@@ -60,7 +62,24 @@ export class Game extends Scene {
             this.targetPosition = new Phaser.Math.Vector2(pointer.worldX, pointer.worldY);
         });
 
+        // Create the minimap
+        this.createMinimap();
+
         EventBus.emit('current-scene-ready', this);
+    }
+
+    createMinimap() {
+        const minimapWidth = 200;  // Width of the minimap
+        const minimapHeight = 200; // Height of the minimap
+
+        // Create a new camera for the minimap
+        this.minimap = this.cameras.add(10, 10, minimapWidth, minimapHeight).setZoom(0.1).setBackgroundColor(0x222222);
+        this.minimap.scrollX = this.player.x - minimapWidth / 2;
+        this.minimap.scrollY = this.player.y - minimapHeight / 2;
+
+        // Create a graphics object to draw the player's position on the minimap
+        this.minimapGraphics = this.add.graphics();
+        this.minimap.ignore(this.minimapGraphics);  // Ignore the graphics in the main camera
     }
 
     isCollidable(x: number, y: number): boolean {
@@ -99,6 +118,14 @@ export class Game extends Scene {
                 this.targetPosition = null;  // Stop moving
             }
         }
+
+        // Update the minimap graphics to show the player's position
+        this.updateMinimap();
     }
 
+    updateMinimap() {
+        this.minimapGraphics.clear();
+        // Center the minimap camera on the player
+        this.minimap.centerOn(this.player.x, this.player.y);
+    }
 }
