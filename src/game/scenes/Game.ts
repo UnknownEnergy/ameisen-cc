@@ -36,14 +36,31 @@ export class Game extends Scene {
             row.forEach((cell, colIndex) => {
                 const x = colIndex * this.gridSize;
                 const y = rowIndex * this.gridSize;
-                const texture = cell === '0' ? 'water' : 'grass';
+                let texture = '';
 
-                this.add.image(x + this.gridSize / 2, y + this.gridSize / 2, texture).setDisplaySize(this.gridSize, this.gridSize);
+                if (cell === '0') {
+                    texture = 'water';
+                } else if (cell === '1') {
+                    texture = 'grass';
+                } else if (cell === '2') {
+                    texture = 'tree';
+                } else {
+                    texture = 'grass';
+                }
 
-                // Check if the cell is '2' (player spawn position)
-                if (cell === '2') {
+                if (texture) {
+                    this.add.image(x + this.gridSize / 2, y + this.gridSize / 2, texture).setDisplaySize(this.gridSize, this.gridSize);
+                }
+
+                // Check if the cell is '3' (player spawn position)
+                if (cell === '3') {
                     playerSpawnX = x + this.gridSize / 2;
                     playerSpawnY = y + this.gridSize / 2;
+                }
+
+                // Handle tree spanning two blocks
+                if (cell === '2') {
+                    this.add.image(x + this.gridSize / 2, y + this.gridSize / 2 + this.gridSize, 'tree').setDisplaySize(this.gridSize, this.gridSize);
                 }
             });
         });
@@ -87,7 +104,8 @@ export class Game extends Scene {
         const row = Math.floor(y / this.gridSize);
 
         if (row >= 0 && row < this.mapData.length && col >= 0 && col < this.mapData[row].length) {
-            return this.mapData[row][col] === '0'; // '0' indicates a water tile
+            const cell = this.mapData[row][col];
+            return cell === '0' || cell === '2'; // '0' indicates a water tile, '2' indicates a tree tile
         }
 
         return false;
@@ -106,7 +124,7 @@ export class Game extends Scene {
                 const nextPlayerX = this.player.x + offsetX;
                 const nextPlayerY = this.player.y + offsetY;
 
-                // Check for collision with water at the player's next position
+                // Check for collision with water or tree at the player's next position
                 if (!this.isCollidable(nextPlayerX, nextPlayerY)) {
                     this.player.x = nextPlayerX;
                     this.player.y = nextPlayerY;

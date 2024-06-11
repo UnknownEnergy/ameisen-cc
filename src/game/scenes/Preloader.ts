@@ -18,6 +18,7 @@ export class Preloader extends Scene
 
         this.load.image('grass', 'gras.jpg');
         this.load.image('water', 'water.jpg');
+        this.load.image('tree', 'tree.jpg');
         this.load.text('map', 'map1.csv');
         this.load.image('gast', 'gast.png');
     }
