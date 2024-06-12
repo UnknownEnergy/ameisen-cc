@@ -17,6 +17,7 @@ export class Game extends Scene {
     speechBubble: SpeechBubble;
     typedText: string = '';
     playerCommands: PlayerCommands;
+    private chests: Phaser.Physics.Arcade.Group;
 
     constructor() {
         super('Game');
@@ -46,9 +47,34 @@ export class Game extends Scene {
         // Set collision for all tiles in the treeLayer
         this.treeLayer.setCollisionByExclusion([-1]);
 
+        // Create a group to hold all chests
+        this.chests = this.physics.add.group({
+            immovable: true,
+            allowGravity: false
+        });
+
+        // Function to generate random positions
+        const getRandomPosition = (min: number, max: number) => {
+            return Math.floor(Math.random() * (max - min + 1) + min) * this.gridSize;
+        };
+
+        // Number of chests to spawn
+        const numberOfChests = 50;
+
+        for (let i = 0; i < numberOfChests; i++) {
+            const x = getRandomPosition(0, 400);
+            const y = getRandomPosition(0, 165);
+
+            let chest = this.chests.create(x, y, 'chest', 0);
+            chest.setImmovable(true);
+            chest.setInteractive(); // Allow it to be interactive for click events
+        }
+
         // Add the player image at the spawn position and enable physics
         this.player = this.physics.add.sprite(this.gridSize * 150, this.gridSize * 140, 'player', 0)
             .setOrigin(0.5, 1);  // Set the origin to bottom center
+
+        this.physics.add.collider(this.player, this.chests);
 
 // Adjust the player's physics body offset and size.
         // @ts-ignore
@@ -64,6 +90,13 @@ export class Game extends Scene {
         // Add input listener for mouse click or touch
         this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
             this.targetPosition = new Phaser.Math.Vector2(pointer.worldX, pointer.worldY);
+        });
+
+        // Add click event listener for chests
+        this.input.on('gameobjectdown', (pointer: any, gameObject: { texture: { key: string; }; setFrame: (arg0: number) => void; }) => {
+            if (gameObject.texture.key === 'chest') {
+                gameObject.setFrame(1); // Change the frame to 1
+            }
         });
 
         // Optional: Add keyboard input for debugging

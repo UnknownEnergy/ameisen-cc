@@ -20,6 +20,10 @@ export class Preloader extends Scene
             frameWidth: 64,
             frameHeight: 94
         });
+        this.load.spritesheet('chest', 'spritesheets/chestspritesheets.png', {
+            frameWidth: 64,
+            frameHeight: 64
+        });
     }
 
     create ()
