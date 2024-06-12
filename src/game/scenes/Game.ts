@@ -109,6 +109,14 @@ export class Game extends Scene {
             }
         });
 
+        // Add touch event listener for long press or touch
+        this.input.on('pointerdown', this.onPointerDown, this);
+        this.input.on('pointerup', this.onPointerUp, this);
+        this.input.on('pointermove', this.onPointerMove, this);
+
+        // Create an HTML input element (hidden initially)
+        this.createInputField();
+
         // Optional: Add keyboard input for debugging
         // @ts-ignore
         this.cursors = this.input.keyboard.createCursorKeys();
@@ -216,6 +224,80 @@ export class Game extends Scene {
             this.speechBubble.setText(this.typedText);
             this.speechBubble.show();
         }
+    }
+
+    private pointerDownTime: number = 0;
+    private longPressDuration: number = 500;
+
+    private onPointerDown(pointer: Phaser.Input.Pointer) {
+        this.pointerDownTime = this.time.now;
+    }
+
+    private onPointerUp(pointer: Phaser.Input.Pointer) {
+        const duration = this.time.now - this.pointerDownTime;
+        if (duration >= this.longPressDuration) {
+            this.showInputField(pointer.worldX, pointer.worldY);
+        }
+        this.pointerDownTime = 0;
+    }
+
+    private onPointerMove(pointer: Phaser.Input.Pointer) {
+        if (this.pointerDownTime > 0) {
+            const duration = this.time.now - this.pointerDownTime;
+            if (duration >= this.longPressDuration) {
+                this.showInputField(pointer.worldX, pointer.worldY);
+                this.pointerDownTime = 0;
+            }
+        }
+    }
+
+    private inputField: HTMLInputElement;
+
+    private createInputField() {
+        this.inputField = document.createElement('input');
+        this.inputField.type = 'text';
+        this.inputField.style.position = 'absolute';
+        this.inputField.style.top = '-100px';  // Hide it initially
+        this.inputField.style.left = '-100px';
+        this.inputField.style.opacity = '0';
+        document.body.appendChild(this.inputField);
+
+        // Add event listener to handle input
+        this.inputField.addEventListener('input', (event) => {
+            this.typedText = this.inputField.value;
+            this.speechBubble.setText(this.typedText);
+            this.speechBubble.show();
+        });
+
+        // Add event listener to handle 'Enter' key
+        this.inputField.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter') {
+                this.speechBubble.setText(this.typedText, 0xffffff);
+                this.playerCommands.executeCommand(this.typedText);
+                this.speechBubble.startTypingTimer();
+                this.inputField.value = '';
+                this.hideInputField();
+            } else if (event.key === 'Backspace') {
+                // Sync backspace with speech bubble text
+                this.typedText = this.typedText.slice(0, -1);
+                this.speechBubble.setText(this.typedText);
+            }
+        });
+    }
+
+    private showInputField(x: number, y: number) {
+        const rect = this.game.canvas.getBoundingClientRect();
+        this.inputField.style.top = `${rect.top + y}px`;
+        this.inputField.style.left = `${rect.left + x}px`;
+        this.inputField.style.opacity = '1';
+        this.inputField.focus();
+    }
+
+    private hideInputField() {
+        this.inputField.style.top = '-100px';
+        this.inputField.style.left = '-100px';
+        this.inputField.style.opacity = '0';
+        this.inputField.blur();
     }
 
 }
