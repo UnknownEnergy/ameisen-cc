@@ -1,5 +1,6 @@
 import { EventBus } from '../EventBus';
 import { Scene } from 'phaser';
+import { SpeechBubble } from '../SpeechBubble';
 
 export class Game extends Scene {
     camera: Phaser.Cameras.Scene2D.Camera;
@@ -12,6 +13,8 @@ export class Game extends Scene {
     groundLayer: Phaser.Tilemaps.TilemapLayer;
     waterLayer: Phaser.Tilemaps.TilemapLayer;
     treeLayer: Phaser.Tilemaps.TilemapLayer;
+    speechBubble: SpeechBubble;
+    typedText: string = '';
 
     constructor() {
         super('Game');
@@ -60,6 +63,13 @@ export class Game extends Scene {
         // @ts-ignore
         this.cursors = this.input.keyboard.createCursorKeys();
 
+        // Create the speech bubble
+        this.speechBubble = new SpeechBubble(this, this.player.x, this.player.y - 100);
+
+        // Add keyboard input for typing text
+        // @ts-ignore
+        this.input.keyboard.on('keydown', this.handleTyping, this);
+
         // Make the camera follow the player instantly
         this.camera.startFollow(this.player);
         // Round camera position to avoid sub-pixel rendering
@@ -73,6 +83,24 @@ export class Game extends Scene {
         this.cameras.getCamera('mini').roundPixels = true;
 
         EventBus.emit('current-scene-ready', this);
+    }
+
+    handleTyping(event: KeyboardEvent) {
+        if (event.key === 'Enter') {
+            // Change bubble color to white and start timer to hide it
+            this.speechBubble.setText(this.typedText, 0xffffff);
+            this.speechBubble.startTypingTimer();
+            this.typedText = '';  // Clear typed text
+        } else if (event.key === 'Backspace') {
+            // Remove last character
+            this.typedText = this.typedText.slice(0, -1);
+            this.speechBubble.setText(this.typedText);
+        } else if (event.key.length === 1) {
+            // Append character to text
+            this.typedText += event.key;
+            this.speechBubble.setText(this.typedText);
+            this.speechBubble.show();
+        }
     }
 
     override update(time: number, delta: number) {
@@ -100,5 +128,8 @@ export class Game extends Scene {
         // Sync the minimap camera with the main camera
         this.minimapCamera.scrollX = this.camera.scrollX;
         this.minimapCamera.scrollY = this.camera.scrollY;
+
+        // Update speech bubble position to follow the player
+        this.speechBubble.setPosition(this.player.x, this.player.y - 100);
     }
 }
