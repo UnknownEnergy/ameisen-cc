@@ -38,7 +38,7 @@ export class PlayerCommands {
             "skin": {
                 description: "Changes skin to chosen number.",
                 action: (args: string[]) => {
-                    const skinNumber = parseInt(args[0], 2);
+                    const skinNumber = parseInt(args[0], 50);
                     if (!isNaN(skinNumber)) {
                         player.setFrame(skinNumber);
                     } else {
