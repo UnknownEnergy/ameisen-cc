@@ -20,7 +20,8 @@ This is an open-source game inspired by an old game called ameisen.cc
 
 ## Production Github page
 
-To access the game open https://unknownenergy.github.io/ameisen-cc/browser/
+To access the game open https://unknownenergy.github.io/ameisen-cc/browser/  
+Use in-game chat `/help` for more information.
 
 ## Writing Code
 

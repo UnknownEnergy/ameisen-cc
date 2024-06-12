@@ -38,12 +38,8 @@ export class PlayerCommands {
             "skin": {
                 description: "Changes skin to chosen number.",
                 action: (args: string[]) => {
-                    const skinNumber = parseInt(args[0], 50);
-                    if (!isNaN(skinNumber)) {
-                        player.setFrame(skinNumber);
-                    } else {
-                        this.speechBubble.setText("Invalid skin number.");
-                    }
+                    const skinNumber = args[0];
+                    player.setFrame(skinNumber);
                 }
             },
             "position": {
