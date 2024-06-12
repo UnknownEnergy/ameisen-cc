@@ -35,6 +35,17 @@ export class PlayerCommands {
                 description: "Teleports the player to Wald.",
                 action: () => player.setPosition(9827, 1459)
             },
+            "skin": {
+                description: "Changes skin to chosen number.",
+                action: (args: string[]) => {
+                    const skinNumber = parseInt(args[0], 2);
+                    if (!isNaN(skinNumber)) {
+                        player.setFrame(skinNumber);
+                    } else {
+                        this.speechBubble.setText("Invalid skin number.");
+                    }
+                }
+            },
             "position": {
                 description: "Displays the player's current position.",
                 action: () => speechBubble.setText(`x: ${player.x} y: ${player.y}`)
@@ -44,11 +55,14 @@ export class PlayerCommands {
 
     executeCommand(typedText: string) {
         if (typedText.startsWith("/")) {
-            const command = typedText.slice(1); // Remove the leading "/"
+            const parts = typedText.slice(1).split(" "); // Remove the leading "/" and split the command and arguments
+            const command = parts[0];
+            const args = parts.slice(1);
+
             if (command === "help") {
                 this.showHelp();
             } else if (this.commands[command]) {
-                this.commands[command].action();
+                this.commands[command].action(args);
             } else {
                 this.speechBubble.setText(`Unknown command: ${command}`);
             }

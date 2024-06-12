@@ -32,7 +32,7 @@ export class Game extends Scene {
         const map = this.make.tilemap({ key: 'map' });
 
         // Add the tileset image to the map
-        const tileset = map.addTilesetImage('tileset', 'tiles', 64, 64, 0, 0);
+        const tileset = map.addTilesetImage('tileset', 'blocks', 64, 64, 0, 0);
 
         // Create layers from the map
         // @ts-ignore
@@ -47,8 +47,7 @@ export class Game extends Scene {
         this.treeLayer.setCollisionByExclusion([-1]);
 
         // Add the player image at the spawn position and enable physics
-        this.player = this.physics.add.image(this.gridSize * 150, this.gridSize * 140, 'gast')
-            .setDisplaySize(this.gridSize, this.gridSize)
+        this.player = this.physics.add.sprite(this.gridSize * 150, this.gridSize * 140, 'player',0)
             .setOrigin(0.5, 0.5);  // Ensure the player is centered
 
         // Add collision between player and treeLayer

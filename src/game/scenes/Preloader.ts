@@ -13,13 +13,13 @@ export class Preloader extends Scene
 
     preload ()
     {
-        //  Load the assets for the game - Replace with your own assets
         this.load.setPath('assets');
-        // Load the tileset image
-        this.load.image('tiles', 'tilesets/tileset.png');
-        // Load the TMX map
+        this.load.image('blocks', 'tilesets/blocks/blocks.png');
         this.load.tilemapTiledJSON('map', 'maps/map.json');
-        this.load.image('gast', 'gast.png');
+        this.load.spritesheet('player', 'spritesheets/playerspritesheet.png', {
+            frameWidth: 64,
+            frameHeight: 94
+        });
     }
 
     create ()
