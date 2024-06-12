@@ -47,8 +47,14 @@ export class Game extends Scene {
         this.treeLayer.setCollisionByExclusion([-1]);
 
         // Add the player image at the spawn position and enable physics
-        this.player = this.physics.add.sprite(this.gridSize * 150, this.gridSize * 140, 'player',0)
-            .setOrigin(0.5, 0.5);  // Ensure the player is centered
+        this.player = this.physics.add.sprite(this.gridSize * 150, this.gridSize * 140, 'player', 0)
+            .setOrigin(0.5, 1);  // Set the origin to bottom center
+
+// Adjust the player's physics body offset and size.
+        // @ts-ignore
+        this.player.body.setSize(this.player.width/2, 20);  // Set the size of the collider
+        // @ts-ignore
+        this.player.body.setOffset(this.player.width/4, this.player.height - 20);  // Adjust the offset to align the collider to the bottom
 
         // Add collision between player and treeLayer
         this.physics.add.collider(this.player, this.treeLayer);
