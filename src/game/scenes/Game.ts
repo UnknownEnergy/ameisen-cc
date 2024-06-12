@@ -1,6 +1,7 @@
 import { EventBus } from '../EventBus';
 import { Scene } from 'phaser';
 import { SpeechBubble } from '../SpeechBubble';
+import {PlayerCommands} from "../PlayerCommands";
 
 export class Game extends Scene {
     camera: Phaser.Cameras.Scene2D.Camera;
@@ -15,6 +16,7 @@ export class Game extends Scene {
     treeLayer: Phaser.Tilemaps.TilemapLayer;
     speechBubble: SpeechBubble;
     typedText: string = '';
+    playerCommands: PlayerCommands;
 
     constructor() {
         super('Game');
@@ -69,6 +71,7 @@ export class Game extends Scene {
         // Add keyboard input for typing text
         // @ts-ignore
         this.input.keyboard.on('keydown', this.handleTyping, this);
+        this.playerCommands = new PlayerCommands(this.player, this.speechBubble);
 
         // Make the camera follow the player instantly
         this.camera.startFollow(this.player);
@@ -85,10 +88,46 @@ export class Game extends Scene {
         EventBus.emit('current-scene-ready', this);
     }
 
+    override update(time: number, delta: number) {
+        if (this.targetPosition) {
+            this.handlePlayerMovement(delta);
+        }
+
+        // Sync the minimap camera with the main camera
+        this.minimapCamera.scrollX = this.camera.scrollX;
+        this.minimapCamera.scrollY = this.camera.scrollY;
+
+        // Update speech bubble position to follow the player
+        this.speechBubble.setPosition(this.player.x, this.player.y - 100);
+    }
+
+    private handlePlayerMovement(delta: number) {
+        // @ts-ignore
+        const direction = this.targetPosition.clone().subtract(new Phaser.Math.Vector2(this.player.x, this.player.y));
+        const distance = direction.length();
+
+        if (distance > this.playerSpeed * delta / 1000) {  // If the distance is greater than the step size
+            direction.normalize();
+            const offsetX = direction.x * this.playerSpeed * delta / 1000;
+            const offsetY = direction.y * this.playerSpeed * delta / 1000;
+
+            const nextPlayerX = this.player.x + offsetX;
+            const nextPlayerY = this.player.y + offsetY;
+
+            // Move the player using physics to handle collisions
+            this.physics.moveTo(this.player, nextPlayerX, nextPlayerY, this.playerSpeed);
+        } else {
+            this.targetPosition = null;  // Stop moving
+            // @ts-ignore
+            this.player.body.setVelocity(0);  // Stop the player
+        }
+    }
+
     handleTyping(event: KeyboardEvent) {
         if (event.key === 'Enter') {
             // Change bubble color to white and start timer to hide it
             this.speechBubble.setText(this.typedText, 0xffffff);
+            this.playerCommands.executeCommand(this.typedText);
             this.speechBubble.startTypingTimer();
             this.typedText = '';  // Clear typed text
         } else if (event.key === 'Backspace') {
@@ -103,33 +142,4 @@ export class Game extends Scene {
         }
     }
 
-    override update(time: number, delta: number) {
-        if (this.targetPosition) {
-            const direction = this.targetPosition.clone().subtract(new Phaser.Math.Vector2(this.player.x, this.player.y));
-            const distance = direction.length();
-
-            if (distance > this.playerSpeed * delta / 1000) {  // If the distance is greater than the step size
-                direction.normalize();
-                const offsetX = direction.x * this.playerSpeed * delta / 1000;
-                const offsetY = direction.y * this.playerSpeed * delta / 1000;
-
-                const nextPlayerX = this.player.x + offsetX;
-                const nextPlayerY = this.player.y + offsetY;
-
-                // Move the player using physics to handle collisions
-                this.physics.moveTo(this.player, nextPlayerX, nextPlayerY, this.playerSpeed);
-            } else {
-                this.targetPosition = null;  // Stop moving
-                // @ts-ignore
-                this.player.body.setVelocity(0);  // Stop the player
-            }
-        }
-
-        // Sync the minimap camera with the main camera
-        this.minimapCamera.scrollX = this.camera.scrollX;
-        this.minimapCamera.scrollY = this.camera.scrollY;
-
-        // Update speech bubble position to follow the player
-        this.speechBubble.setPosition(this.player.x, this.player.y - 100);
-    }
 }

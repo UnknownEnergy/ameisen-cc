@@ -30,7 +30,7 @@ export class SpeechBubble extends Phaser.GameObjects.Container {
         // Update background size based on text size
         this.background.clear();
         this.background.fillStyle(backgroundColor, 1);
-        this.background.fillRoundedRect(-this.text.width / 2 - 10, -this.text.height - 20, this.text.width + 20, this.text.height + 20, 10);
+        this.background.fillRoundedRect(-this.text.width / 2 - 10, -this.text.height / 2 - 30, this.text.width + 20, this.text.height + 20, 10);
     }
 
     show() {
@@ -43,7 +43,7 @@ export class SpeechBubble extends Phaser.GameObjects.Container {
 
     startTypingTimer() {
         this.scene.time.addEvent({
-            delay: 5000,
+            delay: 8000,
             callback: () => {
                 this.hide();
             },
