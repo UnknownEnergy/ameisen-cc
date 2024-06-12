@@ -55,6 +55,7 @@ export class Game extends Scene {
         this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
             this.targetPosition = new Phaser.Math.Vector2(pointer.worldX, pointer.worldY);
         });
+
         // Optional: Add keyboard input for debugging
         // @ts-ignore
         this.cursors = this.input.keyboard.createCursorKeys();
