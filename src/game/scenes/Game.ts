@@ -1,7 +1,7 @@
 import { EventBus } from '../EventBus';
 import { Scene } from 'phaser';
 import { SpeechBubble } from '../SpeechBubble';
-import {PlayerCommands} from "../PlayerCommands";
+import { PlayerCommands } from "../PlayerCommands";
 
 export class Game extends Scene {
     camera: Phaser.Cameras.Scene2D.Camera;
@@ -18,6 +18,7 @@ export class Game extends Scene {
     typedText: string = '';
     playerCommands: PlayerCommands;
     private chests: Phaser.Physics.Arcade.Group;
+    private items: Phaser.Physics.Arcade.Group;
 
     constructor() {
         super('Game');
@@ -53,6 +54,12 @@ export class Game extends Scene {
             allowGravity: false
         });
 
+        // Create a group to hold all items
+        this.items = this.physics.add.group({
+            immovable: true,
+            allowGravity: false
+        });
+
         // Function to generate random positions
         const getRandomPosition = (min: number, max: number) => {
             return Math.floor(Math.random() * (max - min + 1) + min) * this.gridSize;
@@ -76,11 +83,11 @@ export class Game extends Scene {
 
         this.physics.add.collider(this.player, this.chests);
 
-// Adjust the player's physics body offset and size.
+        // Adjust the player's physics body offset and size.
         // @ts-ignore
-        this.player.body.setSize(this.player.width/2, 20);  // Set the size of the collider
+        this.player.body.setSize(this.player.width / 2, 20);  // Set the size of the collider
         // @ts-ignore
-        this.player.body.setOffset(this.player.width/4, this.player.height - 20);  // Adjust the offset to align the collider to the bottom
+        this.player.body.setOffset(this.player.width / 4, this.player.height - 20);  // Adjust the offset to align the collider to the bottom
 
         // Add collision between player and treeLayer
         this.physics.add.collider(this.player, this.treeLayer);
@@ -93,9 +100,12 @@ export class Game extends Scene {
         });
 
         // Add click event listener for chests
-        this.input.on('gameobjectdown', (pointer: any, gameObject: { texture: { key: string; }; setFrame: (arg0: number) => void; }) => {
-            if (gameObject.texture.key === 'chest') {
+        this.input.on('gameobjectdown', (pointer: any, gameObject: {
+            frame: any;
+            texture: { key: string; }; setFrame: (arg0: number) => void; x: number; y: number }) => {
+            if (gameObject.texture.key === 'chest' && gameObject.frame.name !== 1) {
                 gameObject.setFrame(1); // Change the frame to 1
+                this.spawnItems(gameObject.x, gameObject.y); // Spawn items next to the chest
             }
         });
 
@@ -159,6 +169,34 @@ export class Game extends Scene {
             // @ts-ignore
             this.player.body.setVelocity(0);  // Stop the player
         }
+    }
+
+    private spawnItems(chestX: number, chestY: number) {
+        const itemFrames = [0, 1, 2]; // Item frames
+        const itemPositions = [
+            { x: chestX + this.gridSize, y: chestY }, // Right of chest
+            { x: chestX - this.gridSize, y: chestY }, // Left of chest
+            { x: chestX, y: chestY + this.gridSize }, // Below chest
+            { x: chestX, y: chestY - this.gridSize }, // Above chest
+            { x: chestX + this.gridSize, y: chestY + this.gridSize }, // Bottom right diagonal
+            { x: chestX - this.gridSize, y: chestY - this.gridSize }  // Top left diagonal
+        ];
+
+        // Shuffle item frames and positions
+        Phaser.Utils.Array.Shuffle(itemFrames);
+        Phaser.Utils.Array.Shuffle(itemPositions);
+
+        // Spawn 3 items
+        for (let i = 0; i < Phaser.Math.Between(1, 6); i++) {
+            // Select a random frame from the itemFrames array
+            const randomFrameIndex = Phaser.Math.Between(0, itemFrames.length - 1);
+            const itemFrame = itemFrames[randomFrameIndex];
+
+            // Create the item at the shuffled position with the selected frame
+            const item = this.items.create(itemPositions[i].x, itemPositions[i].y, 'items', itemFrame);
+            item.setImmovable(true);
+        }
+
     }
 
     handleTyping(event: KeyboardEvent) {
