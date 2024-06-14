@@ -23,6 +23,8 @@ export class Game extends Scene {
     private otherPlayers: { [key: string]: { sprite: Phaser.Physics.Arcade.Image, speechBubble: SpeechBubble } } = {};
     private playerId: string;
     private readonly SERVER_URI = 'https://grazer.duckdns.org:3000';
+    private delay = 100;
+    private lastFetchTime = 0;
 
     constructor() {
         super('Game');
@@ -161,11 +163,15 @@ export class Game extends Scene {
         // Update speech bubble position to follow the player
         this.speechBubble.setPosition(this.player.x, this.player.y - 100);
 
-        // Send the player data to the server
-        this.sendPlayerData(this.playerId, this.player.x, this.player.y, this.player.frame.name, this.speechBubble.text.text);
-
-        // Fetch and render other players
-        this.fetchAndRenderPlayers();
+        const currentTime = Date.now();
+        // Check if the delay time has passed since the last fetch
+        if (currentTime - this.lastFetchTime >= this.delay) {
+            // Send the player data to the server
+            this.sendPlayerData(this.playerId, this.player.x, this.player.y, this.player.frame.name, this.speechBubble.text.text);
+            // Fetch and render other players
+            this.fetchAndRenderPlayers();
+            this.lastFetchTime = currentTime; // Update the last fetch time
+        }
     }
 
     private handlePlayerMovement(delta: number) {
