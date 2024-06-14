@@ -1,6 +1,6 @@
 export class SpeechBubble extends Phaser.GameObjects.Container {
     background: Phaser.GameObjects.Graphics;
-    text: Phaser.GameObjects.Text;
+    private _text: Phaser.GameObjects.Text;
 
     constructor(scene: Phaser.Scene, x: number, y: number) {
         super(scene, x, y);
@@ -10,12 +10,12 @@ export class SpeechBubble extends Phaser.GameObjects.Container {
         this.add(this.background);
 
         // Create text object
-        this.text = scene.add.text(0, 0, '', {fontSize: '16px', color: '#000'});
-        this.text.setOrigin(0.5, 0.5);
-        this.add(this.text);
+        this._text = scene.add.text(0, 0, '', {fontSize: '16px', color: '#000'});
+        this._text.setOrigin(0.5, 0.5);
+        this.add(this._text);
 
         // Adjust position of text
-        this.text.setPosition(0, -20);
+        this._text.setPosition(0, -20);
 
         // Add to scene
         scene.add.existing(this);
@@ -25,12 +25,16 @@ export class SpeechBubble extends Phaser.GameObjects.Container {
     }
 
     setText(text: string, backgroundColor: number = 0xcccccc) {
-        this.text.setText(text);
+        this._text.setText(text);
 
         // Update background size based on text size
         this.background.clear();
         this.background.fillStyle(backgroundColor, 1);
-        this.background.fillRoundedRect(-this.text.width / 2 - 10, -this.text.height / 2 - 30, this.text.width + 20, this.text.height + 20, 10);
+        this.background.fillRoundedRect(-this._text.width / 2 - 10, -this._text.height / 2 - 30, this._text.width + 20, this._text.height + 20, 10);
+    }
+
+    get text(): Phaser.GameObjects.Text {
+        return this._text;
     }
 
     show() {
@@ -39,6 +43,7 @@ export class SpeechBubble extends Phaser.GameObjects.Container {
 
     hide() {
         this.setVisible(false);
+        this.setText("");
     }
 
     startTypingTimer() {

@@ -2,6 +2,7 @@ import { EventBus } from '../EventBus';
 import { Scene } from 'phaser';
 import { SpeechBubble } from '../SpeechBubble';
 import { PlayerCommands } from "../PlayerCommands";
+import axios from "axios";
 
 export class Game extends Scene {
     camera: Phaser.Cameras.Scene2D.Camera;
@@ -19,12 +20,16 @@ export class Game extends Scene {
     playerCommands: PlayerCommands;
     private chests: Phaser.Physics.Arcade.Group;
     private items: Phaser.Physics.Arcade.Group;
+    private otherPlayers: { [key: string]: { sprite: Phaser.Physics.Arcade.Image, speechBubble: SpeechBubble } } = {};
+    private playerId: string;
+    private readonly SERVER_URI = 'http://homeassistant:3000';
 
     constructor() {
         super('Game');
         this.playerSpeed = 900;  // Set player speed (adjust as necessary)
         this.targetPosition = null; // Initially, no target position
         this.gridSize = 64; // Size of each grid cell
+        this.playerId = this.generateRandomPlayerID();
     }
 
     create() {
@@ -155,6 +160,12 @@ export class Game extends Scene {
 
         // Update speech bubble position to follow the player
         this.speechBubble.setPosition(this.player.x, this.player.y - 100);
+
+        // Send the player data to the server
+        this.sendPlayerData(this.playerId, this.player.x, this.player.y, this.player.frame.name, this.speechBubble.text.text);
+
+        // Fetch and render other players
+        this.fetchAndRenderPlayers();
     }
 
     private handlePlayerMovement(delta: number) {
@@ -205,6 +216,48 @@ export class Game extends Scene {
             item.setImmovable(true);
         }
 
+    }
+
+    async fetchAndRenderPlayers() {
+        try {
+            const response = await axios.get(this.SERVER_URI + '/players');
+            const players = response.data;
+
+            players.forEach((player: { player_id: string; x: number; y: number; skin: string; chat: string}) => {
+                if (player.player_id !== this.playerId) {
+                    let otherPlayer = this.otherPlayers[player.player_id];
+                    if (!otherPlayer) {
+                        const sprite = this.physics.add.sprite(player.x, player.y, 'player', player.skin)
+                            .setOrigin(0.5, 1);  // Set the origin to bottom center
+                        const speechBubble = new SpeechBubble(this, player.x, player.y - 100);
+                        speechBubble.setText(player.chat);
+                        speechBubble.show();
+
+                        this.otherPlayers[player.player_id] = { sprite, speechBubble };
+                    } else {
+                        otherPlayer.sprite.setPosition(player.x, player.y);
+                        otherPlayer.sprite.setFrame(player.skin);
+                        otherPlayer.speechBubble.setPosition(player.x, player.y - 100);
+                        otherPlayer.speechBubble.setText(player.chat);
+                        if(player.chat) {
+                            otherPlayer.speechBubble.show();
+                        } else {
+                            otherPlayer.speechBubble.hide();
+                        }
+                    }
+                }
+            });
+        } catch (error) {
+            console.error('Error fetching players data:', error);
+        }
+    }
+
+    async sendPlayerData(playerId: string, x: number, y: number, skin: string, chat: String) {
+        try {
+            await axios.post(this.SERVER_URI + '/player', { playerId, x, y, skin, chat });
+        } catch (error) {
+            console.error('Error sending player data:', error);
+        }
     }
 
     handleTyping(event: KeyboardEvent) {
@@ -300,4 +353,9 @@ export class Game extends Scene {
         this.inputField.blur();
     }
 
+    generateRandomPlayerID() {
+        const timestamp = Date.now();
+        const randomNum = Math.floor(Math.random() * 1000000); // Generate a number between 0 and 999999
+        return `player_${timestamp}_${randomNum}`;
+    }
 }
