@@ -22,7 +22,7 @@ export class Game extends Scene {
     private items: Phaser.Physics.Arcade.Group;
     private otherPlayers: { [key: string]: { sprite: Phaser.Physics.Arcade.Image, speechBubble: SpeechBubble } } = {};
     private playerId: string;
-    private readonly SERVER_URI = 'https://homeassistant:3000';
+    private readonly SERVER_URI = 'https://grazer.duckdns.org:3000';
 
     constructor() {
         super('Game');
