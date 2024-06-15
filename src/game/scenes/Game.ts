@@ -28,8 +28,8 @@ export class Game extends Scene {
             playerNameText: Phaser.GameObjects.Text
         }
     } = {};
-    private readonly SERVER_URI = 'https://grazer.duckdns.org:3000';
-    //private readonly SERVER_URI = 'https://localhost:3000';
+    //private readonly SERVER_URI = 'https://grazer.duckdns.org:3000';
+    private readonly SERVER_URI = 'https://localhost:3000';
     private delay = 500;
     private delay2 = 3000;
     private lastFetchTime = 0;
@@ -94,12 +94,48 @@ export class Game extends Scene {
 
             if (chestData.is_open) {
                 chest.setFrame(1);
-                chestData.items.forEach(
-                    (itemData: any) => {
-                        const item = this.items.create(itemData.x, itemData.y, 'items', itemData.frame);
-                        item.setData('id', itemData.id);
-                        item.setImmovable(true);
-                    });
+            }
+        });
+    }
+
+    private async fetchItemsData() {
+        try {
+            const response = await axios.get(this.SERVER_URI + '/items', {
+                headers: {
+                    // @ts-ignore
+                    Authorization: `Bearer ${(window.authToken)}`
+                }
+            });
+
+            const items = response.data;
+            this.renderItems(items);
+        } catch (error) {
+            console.error('Failed to fetch chests data', error);
+        }
+    }
+
+    private itemMap: Map<any, { item: Phaser.Physics.Arcade.Sprite, text: Phaser.GameObjects.Text }> = new Map();
+
+    renderItems(items: any[]) {
+        items.forEach((itemData: any) => {
+            if (this.itemMap.has(itemData.id)) {
+                // Update the existing item and text
+                const {item, text} = this.itemMap.get(itemData.id)!;
+                item.setPosition(itemData.x, itemData.y);
+                text.setPosition(itemData.x, itemData.y - 30).setText('Item of\n' + (window as any).email);
+            } else {
+                // Create new item and text
+                const item = this.items.create(itemData.x, itemData.y, 'items', itemData.frame);
+                item.setData('id', itemData.id);
+                item.setImmovable(true);
+
+                const text = this.add.text(itemData.x, itemData.y - 30, 'Item of\n' + (window as any).email, {
+                    fontSize: '10px',
+                    align: 'center'
+                }).setOrigin(0.5);
+
+                // Store the new item and text in the map
+                this.itemMap.set(itemData.id, {item, text});
             }
         });
     }
@@ -170,7 +206,7 @@ export class Game extends Scene {
                 // @ts-ignore
                 const chestId = gameObject.getData('id');
                 gameObject.setFrame(1); // Change the frame to 1
-                axios.put(this.SERVER_URI + '/chests/' + chestId + '/open', {} , {
+                axios.put(this.SERVER_URI + '/chests/' + chestId + '/open', {}, {
                     headers: {
                         Authorization: `Bearer ${(window as any).authToken}`
                     }
@@ -240,6 +276,7 @@ export class Game extends Scene {
 
         if (currentTime - this.lastFetchTime2 >= this.delay2) {
             this.fetchChestsData();
+            this.fetchItemsData();
             this.lastFetchTime2 = currentTime; // Update the last fetch time
         }
     }
