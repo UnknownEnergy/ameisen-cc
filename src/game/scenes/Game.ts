@@ -40,6 +40,33 @@ export class Game extends Scene {
         this.gridSize = 64; // Size of each grid cell
     }
 
+    async preload() {
+        await this.initializePlayersPosition();
+    }
+
+    private async initializePlayersPosition() {
+        try {
+            const response = await axios.get(this.SERVER_URI + '/players', {
+                headers: {
+                    // @ts-ignore
+                    Authorization: `Bearer ${(window).authToken}`
+                }
+            });
+            const players = response.data;
+            players.forEach((player: { player_id: any; x: number; y: number; skin: string | number | Phaser.Textures.Frame; }) => {
+                // @ts-ignore
+                if (player.player_id === window.email) {
+                    // If own player, initialize last position
+                    this.player.x = player.x;
+                    this.player.y = player.y;
+                    this.player.setFrame(player.skin);
+                }
+            });
+        } catch (error) {
+            console.error('Error fetching players data:', error);
+        }
+    }
+
     create() {
         this.camera = this.cameras.main;
 
@@ -181,10 +208,10 @@ export class Game extends Scene {
         const currentTime = Date.now();
         // Check if the delay time has passed since the last fetch
         if (currentTime - this.lastFetchTime >= this.delay) {
-            // Send the player data to the server
             this.sendPlayerData(this.player.x, this.player.y, this.player.frame.name, this.speechBubble.text.text);
             // Fetch and render other players
             this.fetchAndRenderPlayers();
+            // Send the player data to the server
             this.lastFetchTime = currentTime; // Update the last fetch time
         }
     }
