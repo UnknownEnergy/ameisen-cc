@@ -230,7 +230,7 @@ export class Game extends Scene {
         try {
             const response = await axios.get(this.SERVER_URI + '/players', {
                 headers: {
-                    Authorization: `Bearer ${GoogleLoginComponent.id_token}`
+                    Authorization: `Bearer ${(window as any).authToken}`
                 }
             });
             const players = response.data;
@@ -268,7 +268,7 @@ export class Game extends Scene {
         try {
             await axios.post(this.SERVER_URI + '/player', { playerId, x, y, skin, chat }, {
                 headers: {
-                    Authorization: `Bearer ${GoogleLoginComponent.id_token}`
+                    Authorization: `Bearer ${(window as any).authToken}`
                 }
             } );
         } catch (error) {

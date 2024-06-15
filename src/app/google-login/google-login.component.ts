@@ -20,7 +20,6 @@ export class GoogleLoginComponent implements OnInit {
     private readonly SERVER_URI = 'https://grazer.duckdns.org:3000';
     //private readonly SERVER_URI = 'http://localhost:3000';
     isAuthSuccessful: boolean = false;
-    static id_token ='';
 
     constructor(private http: HttpClient,
                 private cd: ChangeDetectorRef) {
@@ -47,10 +46,11 @@ export class GoogleLoginComponent implements OnInit {
         const auth2 = gapi.auth2.getAuthInstance();
         auth2.attachClickHandler(element, {},
             (googleUser: { getAuthResponse: () => { (): any; new(): any; id_token: any; }; }) => {
-                GoogleLoginComponent.id_token = googleUser.getAuthResponse().id_token;
+                // Expose the token to the global scope
+                (window as any).authToken = googleUser.getAuthResponse().id_token;
 
                 // Send the ID token to your server
-                this.http.post(this.SERVER_URI + '/auth/google', {token: GoogleLoginComponent.id_token}).subscribe(
+                this.http.post(this.SERVER_URI + '/auth/google', {token:  (window as any).authToken}).subscribe(
                     (response) => {
                         console.log('Success:', response);
                         this.isAuthSuccessful = true;
