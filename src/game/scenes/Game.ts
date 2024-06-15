@@ -1,14 +1,14 @@
-import { EventBus } from '../EventBus';
-import { Scene } from 'phaser';
-import { SpeechBubble } from '../SpeechBubble';
-import { PlayerCommands } from "../PlayerCommands";
+import {EventBus} from '../EventBus';
+import {Scene} from 'phaser';
+import {SpeechBubble} from '../SpeechBubble';
+import {PlayerCommands} from "../PlayerCommands";
 import axios from "axios";
-import {GoogleLoginComponent} from "../../app/google-login/google-login.component";
 
 export class Game extends Scene {
     camera: Phaser.Cameras.Scene2D.Camera;
     minimapCamera: Phaser.Cameras.Scene2D.Camera;
     player: Phaser.Physics.Arcade.Image;  // Changed type to Phaser.Physics.Arcade.Image
+    private playerNameText: Phaser.GameObjects.Text;
     playerSpeed: number;  // Speed at which the world moves
     targetPosition: Phaser.Math.Vector2 | null; // Target position to move towards
     gridSize: number;
@@ -21,7 +21,13 @@ export class Game extends Scene {
     playerCommands: PlayerCommands;
     private chests: Phaser.Physics.Arcade.Group;
     private items: Phaser.Physics.Arcade.Group;
-    private otherPlayers: { [key: string]: { sprite: Phaser.Physics.Arcade.Image, speechBubble: SpeechBubble } } = {};
+    private otherPlayers: {
+        [key: string]: {
+            sprite: Phaser.Physics.Arcade.Image,
+            speechBubble: SpeechBubble,
+            playerNameText: Phaser.GameObjects.Text
+        }
+    } = {};
     private readonly SERVER_URI = 'https://grazer.duckdns.org:3000';
     //private readonly SERVER_URI = 'http://localhost:3000';
     private delay = 100;
@@ -38,7 +44,7 @@ export class Game extends Scene {
         this.camera = this.cameras.main;
 
         // Create the tilemap from the loaded JSON file
-        const map = this.make.tilemap({ key: 'map' });
+        const map = this.make.tilemap({key: 'map'});
 
         // Add the tileset image to the map
         const tileset = map.addTilesetImage('tileset', 'blocks', 64, 64, 0, 0);
@@ -88,6 +94,11 @@ export class Game extends Scene {
         this.player = this.physics.add.sprite(this.gridSize * 150, this.gridSize * 140, 'player', 0)
             .setOrigin(0.5, 1);  // Set the origin to bottom center
 
+        // Create text object for the player name
+        this.playerNameText = this.add.text(this.player.x, this.player.y - 120, (window as any).email, {
+            fontSize: '16px',
+        }).setOrigin(0.5);
+
         this.physics.add.collider(this.player, this.chests);
 
         // Adjust the player's physics body offset and size.
@@ -109,7 +120,8 @@ export class Game extends Scene {
         // Add click event listener for chests
         this.input.on('gameobjectdown', (pointer: any, gameObject: {
             frame: any;
-            texture: { key: string; }; setFrame: (arg0: number) => void; x: number; y: number }) => {
+            texture: { key: string; }; setFrame: (arg0: number) => void; x: number; y: number
+        }) => {
             if (gameObject.texture.key === 'chest' && gameObject.frame.name !== 1) {
                 gameObject.setFrame(1); // Change the frame to 1
                 this.spawnItems(gameObject.x, gameObject.y); // Spawn items next to the chest
@@ -160,8 +172,11 @@ export class Game extends Scene {
         this.minimapCamera.scrollX = this.camera.scrollX;
         this.minimapCamera.scrollY = this.camera.scrollY;
 
+        // Update player name text position
+        this.playerNameText.setPosition(this.player.x, this.player.y - 105);
+
         // Update speech bubble position to follow the player
-        this.speechBubble.setPosition(this.player.x, this.player.y - 100);
+        this.speechBubble.setPosition(this.player.x, this.player.y - 120);
 
         const currentTime = Date.now();
         // Check if the delay time has passed since the last fetch
@@ -199,12 +214,12 @@ export class Game extends Scene {
     private spawnItems(chestX: number, chestY: number) {
         const itemFrames = [0, 1, 2]; // Item frames
         const itemPositions = [
-            { x: chestX + this.gridSize, y: chestY }, // Right of chest
-            { x: chestX - this.gridSize, y: chestY }, // Left of chest
-            { x: chestX, y: chestY + this.gridSize }, // Below chest
-            { x: chestX, y: chestY - this.gridSize }, // Above chest
-            { x: chestX + this.gridSize, y: chestY + this.gridSize }, // Bottom right diagonal
-            { x: chestX - this.gridSize, y: chestY - this.gridSize }  // Top left diagonal
+            {x: chestX + this.gridSize, y: chestY}, // Right of chest
+            {x: chestX - this.gridSize, y: chestY}, // Left of chest
+            {x: chestX, y: chestY + this.gridSize}, // Below chest
+            {x: chestX, y: chestY - this.gridSize}, // Above chest
+            {x: chestX + this.gridSize, y: chestY + this.gridSize}, // Bottom right diagonal
+            {x: chestX - this.gridSize, y: chestY - this.gridSize}  // Top left diagonal
         ];
 
         // Shuffle item frames and positions
@@ -233,23 +248,29 @@ export class Game extends Scene {
             });
             const players = response.data;
 
-            players.forEach((player: { player_id: string; x: number; y: number; skin: string; chat: string}) => {
+            players.forEach((player: { player_id: string; x: number; y: number; skin: string; chat: string }) => {
                 if (player.player_id !== (window as any).email) {
                     let otherPlayer = this.otherPlayers[player.player_id];
                     if (!otherPlayer) {
                         const sprite = this.physics.add.sprite(player.x, player.y, 'player', player.skin)
                             .setOrigin(0.5, 1);  // Set the origin to bottom center
-                        const speechBubble = new SpeechBubble(this, player.x, player.y - 100);
+                        const speechBubble = new SpeechBubble(this, player.x, player.y - 120);
                         speechBubble.setText(player.chat);
                         speechBubble.show();
 
-                        this.otherPlayers[player.player_id] = { sprite, speechBubble };
+                        // Create text object for other player name
+                        const playerNameText = this.add.text(player.x, player.y - 105, player.player_id, {
+                            fontSize: '16px'
+                        }).setOrigin(0.5);
+
+                        this.otherPlayers[player.player_id] = {sprite, speechBubble, playerNameText};
                     } else {
                         otherPlayer.sprite.setPosition(player.x, player.y);
                         otherPlayer.sprite.setFrame(player.skin);
-                        otherPlayer.speechBubble.setPosition(player.x, player.y - 100);
+                        otherPlayer.speechBubble.setPosition(player.x, player.y - 120);
                         otherPlayer.speechBubble.setText(player.chat);
-                        if(player.chat) {
+                        otherPlayer.playerNameText.setPosition(player.x, player.y - 105);
+                        if (player.chat) {
                             otherPlayer.speechBubble.show();
                         } else {
                             otherPlayer.speechBubble.hide();
@@ -264,11 +285,11 @@ export class Game extends Scene {
 
     async sendPlayerData(x: number, y: number, skin: string, chat: String) {
         try {
-            await axios.post(this.SERVER_URI + '/player', { x, y, skin, chat }, {
+            await axios.post(this.SERVER_URI + '/player', {x, y, skin, chat}, {
                 headers: {
                     Authorization: `Bearer ${(window as any).authToken}`
                 }
-            } );
+            });
         } catch (error) {
             console.error('Error sending player data:', error);
         }
