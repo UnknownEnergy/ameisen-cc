@@ -3,6 +3,7 @@ import {HttpClient, HttpClientModule} from "@angular/common/http";
 import {gapi, loadGapiInsideDOM} from "gapi-script";
 import {PhaserGame} from "../../game/phaser-game.component";
 import {NgIf} from "@angular/common";
+import {environment} from "../../environments/environment";
 
 @Component({
     selector: 'app-google-login',
@@ -16,9 +17,8 @@ import {NgIf} from "@angular/common";
     styleUrl: './google-login.component.css'
 })
 export class GoogleLoginComponent implements OnInit {
-    private clientId: string = '340545855934-fh3pjeqo9c2mmtbg10aa5e4bc3n1e447.apps.googleusercontent.com';
-    private readonly SERVER_URI = 'https://grazer.duckdns.org:3000';
-    //private readonly SERVER_URI = 'http://localhost:3000';
+    private clientId: string = environment.googleClientId;
+    private readonly SERVER_URI = environment.apiUrl;
     isAuthSuccessful: boolean = false;
 
     constructor(private http: HttpClient,

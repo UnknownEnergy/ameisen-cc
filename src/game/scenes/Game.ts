@@ -3,6 +3,7 @@ import {Scene} from 'phaser';
 import {SpeechBubble} from '../SpeechBubble';
 import {PlayerCommands} from "../PlayerCommands";
 import axios from "axios";
+import { environment } from '../../environments/environment';
 
 export class Game extends Scene {
     camera: Phaser.Cameras.Scene2D.Camera;
@@ -28,8 +29,7 @@ export class Game extends Scene {
             playerNameText: Phaser.GameObjects.Text
         }
     } = {};
-    //private readonly SERVER_URI = 'https://grazer.duckdns.org:3000';
-    private readonly SERVER_URI = 'https://localhost:3000';
+    private readonly SERVER_URI = environment.apiUrl;
     private delay = 500;
     private delay2 = 3000;
     private lastFetchTime = 0;
@@ -37,6 +37,7 @@ export class Game extends Scene {
 
     constructor() {
         super('Game');
+        console.log(this.SERVER_URI)
         this.playerSpeed = 900;  // Set player speed (adjust as necessary)
         this.targetPosition = null; // Initially, no target position
         this.gridSize = 64; // Size of each grid cell
