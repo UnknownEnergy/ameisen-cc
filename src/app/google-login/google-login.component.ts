@@ -45,9 +45,12 @@ export class GoogleLoginComponent implements OnInit {
     attachSignin(element: HTMLElement) {
         const auth2 = gapi.auth2.getAuthInstance();
         auth2.attachClickHandler(element, {},
-            (googleUser: { getAuthResponse: () => { (): any; new(): any; id_token: any; }; }) => {
+            (googleUser: { getAuthResponse: () => { (): any; new(): any; id_token: any; };
+                getBasicProfile(): any;
+            }) => {
                 // Expose the token to the global scope
                 (window as any).authToken = googleUser.getAuthResponse().id_token;
+                (window as any).email = googleUser.getBasicProfile().email;
 
                 // Send the ID token to your server
                 this.http.post(this.SERVER_URI + '/auth/google', {token:  (window as any).authToken}).subscribe(

@@ -22,7 +22,6 @@ export class Game extends Scene {
     private chests: Phaser.Physics.Arcade.Group;
     private items: Phaser.Physics.Arcade.Group;
     private otherPlayers: { [key: string]: { sprite: Phaser.Physics.Arcade.Image, speechBubble: SpeechBubble } } = {};
-    private playerId: string;
     private readonly SERVER_URI = 'https://grazer.duckdns.org:3000';
     //private readonly SERVER_URI = 'http://localhost:3000';
     private delay = 100;
@@ -33,7 +32,6 @@ export class Game extends Scene {
         this.playerSpeed = 900;  // Set player speed (adjust as necessary)
         this.targetPosition = null; // Initially, no target position
         this.gridSize = 64; // Size of each grid cell
-        this.playerId = this.generateRandomPlayerID();
     }
 
     create() {
@@ -169,7 +167,7 @@ export class Game extends Scene {
         // Check if the delay time has passed since the last fetch
         if (currentTime - this.lastFetchTime >= this.delay) {
             // Send the player data to the server
-            this.sendPlayerData(this.playerId, this.player.x, this.player.y, this.player.frame.name, this.speechBubble.text.text);
+            this.sendPlayerData(this.player.x, this.player.y, this.player.frame.name, this.speechBubble.text.text);
             // Fetch and render other players
             this.fetchAndRenderPlayers();
             this.lastFetchTime = currentTime; // Update the last fetch time
@@ -236,7 +234,7 @@ export class Game extends Scene {
             const players = response.data;
 
             players.forEach((player: { player_id: string; x: number; y: number; skin: string; chat: string}) => {
-                if (player.player_id !== this.playerId) {
+                if (player.player_id !== (window as any).email) {
                     let otherPlayer = this.otherPlayers[player.player_id];
                     if (!otherPlayer) {
                         const sprite = this.physics.add.sprite(player.x, player.y, 'player', player.skin)
@@ -264,9 +262,9 @@ export class Game extends Scene {
         }
     }
 
-    async sendPlayerData(playerId: string, x: number, y: number, skin: string, chat: String) {
+    async sendPlayerData(x: number, y: number, skin: string, chat: String) {
         try {
-            await axios.post(this.SERVER_URI + '/player', { playerId, x, y, skin, chat }, {
+            await axios.post(this.SERVER_URI + '/player', { x, y, skin, chat }, {
                 headers: {
                     Authorization: `Bearer ${(window as any).authToken}`
                 }
@@ -367,11 +365,5 @@ export class Game extends Scene {
         this.inputField.style.left = '-100px';
         this.inputField.style.opacity = '0';
         this.inputField.blur();
-    }
-
-    generateRandomPlayerID() {
-        const timestamp = Date.now();
-        const randomNum = Math.floor(Math.random() * 1000000); // Generate a number between 0 and 999999
-        return `player_${timestamp}_${randomNum}`;
     }
 }
