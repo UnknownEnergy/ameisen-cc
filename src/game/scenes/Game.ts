@@ -3,6 +3,7 @@ import { Scene } from 'phaser';
 import { SpeechBubble } from '../SpeechBubble';
 import { PlayerCommands } from "../PlayerCommands";
 import axios from "axios";
+import {GoogleLoginComponent} from "../../app/google-login/google-login.component";
 
 export class Game extends Scene {
     camera: Phaser.Cameras.Scene2D.Camera;
@@ -23,6 +24,7 @@ export class Game extends Scene {
     private otherPlayers: { [key: string]: { sprite: Phaser.Physics.Arcade.Image, speechBubble: SpeechBubble } } = {};
     private playerId: string;
     private readonly SERVER_URI = 'https://grazer.duckdns.org:3000';
+    //private readonly SERVER_URI = 'http://localhost:3000';
     private delay = 100;
     private lastFetchTime = 0;
 
@@ -226,7 +228,11 @@ export class Game extends Scene {
 
     async fetchAndRenderPlayers() {
         try {
-            const response = await axios.get(this.SERVER_URI + '/players');
+            const response = await axios.get(this.SERVER_URI + '/players', {
+                headers: {
+                    Authorization: `Bearer ${GoogleLoginComponent.id_token}`
+                }
+            });
             const players = response.data;
 
             players.forEach((player: { player_id: string; x: number; y: number; skin: string; chat: string}) => {
@@ -260,7 +266,11 @@ export class Game extends Scene {
 
     async sendPlayerData(playerId: string, x: number, y: number, skin: string, chat: String) {
         try {
-            await axios.post(this.SERVER_URI + '/player', { playerId, x, y, skin, chat });
+            await axios.post(this.SERVER_URI + '/player', { playerId, x, y, skin, chat }, {
+                headers: {
+                    Authorization: `Bearer ${GoogleLoginComponent.id_token}`
+                }
+            } );
         } catch (error) {
             console.error('Error sending player data:', error);
         }

@@ -18,7 +18,9 @@ import {NgIf} from "@angular/common";
 export class GoogleLoginComponent implements OnInit {
     private clientId: string = '340545855934-fh3pjeqo9c2mmtbg10aa5e4bc3n1e447.apps.googleusercontent.com';
     private readonly SERVER_URI = 'https://grazer.duckdns.org:3000';
+    //private readonly SERVER_URI = 'http://localhost:3000';
     isAuthSuccessful: boolean = false;
+    static id_token ='';
 
     constructor(private http: HttpClient,
                 private cd: ChangeDetectorRef) {
@@ -45,10 +47,10 @@ export class GoogleLoginComponent implements OnInit {
         const auth2 = gapi.auth2.getAuthInstance();
         auth2.attachClickHandler(element, {},
             (googleUser: { getAuthResponse: () => { (): any; new(): any; id_token: any; }; }) => {
-                const id_token = googleUser.getAuthResponse().id_token;
+                GoogleLoginComponent.id_token = googleUser.getAuthResponse().id_token;
 
                 // Send the ID token to your server
-                this.http.post(this.SERVER_URI + '/auth/google', {token: id_token}).subscribe(
+                this.http.post(this.SERVER_URI + '/auth/google', {token: GoogleLoginComponent.id_token}).subscribe(
                     (response) => {
                         console.log('Success:', response);
                         this.isAuthSuccessful = true;
