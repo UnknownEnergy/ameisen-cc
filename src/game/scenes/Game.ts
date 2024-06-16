@@ -129,6 +129,20 @@ export class Game extends Scene {
                 item.setData('id', itemData.id);
                 item.setImmovable(true);
 
+                // Enable input on the item
+                item.setInteractive();
+
+                if (itemData.player_id === (window as any).email) {
+                    this.input.setDraggable(item);
+                    item.on('drag', (pointer: any, dragX: any, dragY: any) => {
+                        item.x = dragX;
+                        item.y = dragY;
+                    });
+                    item.on('dragend', (pointer: any, dragX: any, dragY: any, dropped: any) => {
+                        this.updateItemPosition(itemData.id, item.x, item.y);
+                    });
+                }
+
                 const text = this.add.text(itemData.x, itemData.y - 30, 'Item of\n' + (window as any).email, {
                     fontSize: '10px',
                     align: 'center'
@@ -137,6 +151,18 @@ export class Game extends Scene {
                 // Store the new item and text in the map
                 this.itemMap.set(itemData.id, {item, text});
             }
+        });
+    }
+
+    updateItemPosition(itemId: any, x: any, y: any) {
+        // Send a request to the server to update item position
+        axios.put(this.SERVER_URI + `/items/${itemId}`, {x, y}, {
+            headers: {
+                // @ts-ignore
+                Authorization: `Bearer ${(window.authToken)}`
+            }
+        }).catch(error => {
+            console.error('Error updating item position:', error);
         });
     }
 
