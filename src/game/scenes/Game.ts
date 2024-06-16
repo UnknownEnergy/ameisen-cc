@@ -3,7 +3,7 @@ import {Scene} from 'phaser';
 import {SpeechBubble} from '../SpeechBubble';
 import {PlayerCommands} from "../PlayerCommands";
 import axios from "axios";
-import { environment } from '../../environments/environment';
+import {environment} from '../../environments/environment';
 
 export class Game extends Scene {
     camera: Phaser.Cameras.Scene2D.Camera;
@@ -391,7 +391,7 @@ export class Game extends Scene {
         if (this.pointerDownTime > 0) {
             const duration = this.time.now - this.pointerDownTime;
             if (duration >= this.longPressDuration && this.player.getBounds().contains(pointer.worldX, pointer.worldY)) {
-                this.showInputField(pointer.worldX, pointer.worldY);
+                this.showInputField();
             }
             this.pointerDownTime = 0;
         }
@@ -401,7 +401,7 @@ export class Game extends Scene {
         if (this.pointerDownTime > 0) {
             const duration = this.time.now - this.pointerDownTime;
             if (duration >= this.longPressDuration && this.player.getBounds().contains(pointer.worldX, pointer.worldY)) {
-                this.showInputField(pointer.worldX, pointer.worldY);
+                this.showInputField();
                 this.pointerDownTime = 0;
             }
         }
@@ -441,19 +441,25 @@ export class Game extends Scene {
         });
     }
 
-    private showInputField(x: number, y: number) {
+    private showInputField() {
         const rect = this.game.canvas.getBoundingClientRect();
-        this.inputField.style.top = `${rect.top + y}px`;
-        this.inputField.style.left = `${rect.left + x}px`;
+        const gameWidth = this.game.scale.width;
+        const gameHeight = this.game.scale.height;
+
+        const inputFieldWidth = this.inputField.offsetWidth;
+        const inputFieldHeight = this.inputField.offsetHeight;
+
+        const x = rect.left + (gameWidth - inputFieldWidth) / 2;
+        const y = rect.top + (gameHeight - inputFieldHeight) / 2;
+        this.inputField.style.top = `${y}px`;
+        this.inputField.style.left = `${x}px`;
         this.inputField.style.opacity = '1';
-        this.inputField.hidden =true;
         this.inputField.focus();
     }
 
     private hideInputField() {
-        this.inputField.style.top = '-100px';
-        this.inputField.style.left = '-100px';
         this.inputField.style.opacity = '0';
         this.inputField.blur();
+        this.game.canvas.focus();
     }
 }
