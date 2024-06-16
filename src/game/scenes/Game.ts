@@ -460,13 +460,5 @@ export class Game extends Scene {
     private hideInputField() {
         this.inputField.style.opacity = '0';
         this.inputField.blur();
-        // @ts-ignore
-        document.body.style.zoom = (window.innerWidth / window.outerWidth);
-        var scale = 'scale(1)';
-        document.body.style.webkitTransform =  scale;    // Chrome, Opera, Safari
-        // @ts-ignore
-        document.body.style.msTransform =   scale;       // IE 9
-        document.body.style.transform = scale;     // General
-        this.game.canvas.focus();
     }
 }
