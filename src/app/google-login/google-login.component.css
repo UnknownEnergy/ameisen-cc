@@ -1,0 +1,35 @@
+.login-btn {
+    background-color: #4285f4;
+    color: white;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+
+.login-btn:hover {
+    background-color: #3f79e6;
+}
+
+.login-btn:active {
+    background-color: #356ac3;
+}
+
+.fullscreen-btn {
+    background-color: #34a853;
+    color: white;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+
+.fullscreen-btn:hover {
+    background-color: #2e8b48;
+}
+
+.fullscreen-btn:active {
+    background-color: #267e3f;
+}

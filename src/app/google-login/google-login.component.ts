@@ -29,6 +29,18 @@ export class GoogleLoginComponent implements OnInit {
         this.initGoogleAuth();
     }
 
+    fullScreen() {
+        let elem = document.documentElement;
+        elem
+            .requestFullscreen({ navigationUI: "show" })
+            .then(() => {})
+            .catch((err) => {
+                alert(
+                    `An error occurred while trying to switch into fullscreen mode: ${err.message} (${err.name})`,
+                );
+            });
+    }
+
     initGoogleAuth() {
         loadGapiInsideDOM().then(() => {
             gapi.load('auth2', () => {
