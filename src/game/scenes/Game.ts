@@ -460,6 +460,8 @@ export class Game extends Scene {
     private hideInputField() {
         this.inputField.style.opacity = '0';
         this.inputField.blur();
+        // @ts-ignore
+        document.body.style.zoom = (window.innerWidth / window.outerWidth);
         this.game.canvas.focus();
     }
 }
