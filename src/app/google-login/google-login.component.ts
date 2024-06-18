@@ -1,4 +1,4 @@
-import {ChangeDetectorRef, Component, OnInit} from '@angular/core';
+import {ChangeDetectorRef, Component, ElementRef, OnInit, ViewChild} from '@angular/core';
 import {HttpClient, HttpClientModule} from "@angular/common/http";
 import {gapi, loadGapiInsideDOM} from "gapi-script";
 import {PhaserGame} from "../../game/phaser-game.component";
@@ -20,6 +20,8 @@ export class GoogleLoginComponent implements OnInit {
     private clientId: string = environment.googleClientId;
     private readonly SERVER_URI = environment.apiUrl;
     isAuthSuccessful: boolean = false;
+    isPlayGame: boolean = false;
+    @ViewChild('googleBtn', {static: true}) googleBtn: ElementRef;
 
     constructor(private http: HttpClient,
                 private cd: ChangeDetectorRef) {
@@ -32,11 +34,16 @@ export class GoogleLoginComponent implements OnInit {
     toggleFullScreen() {
         if (document.fullscreenElement) {
             document.exitFullscreen();
+            this.isPlayGame = false;
+            this.cd.detectChanges();
         } else {
             let elem = document.documentElement;
             elem
                 .requestFullscreen({ navigationUI: "show" })
-                .then(() => {})
+                .then(() => {
+                    this.isPlayGame = true;
+                    this.cd.detectChanges();
+                })
                 .catch((err) => {
                     alert(
                         `An error occurred while trying to switch into fullscreen mode: ${err.message} (${err.name})`,

@@ -1,5 +1,5 @@
 <div>
     <button id="googleBtn" *ngIf="!isAuthSuccessful" class="login-btn">Login with Google</button>
-    <button *ngIf="isAuthSuccessful" (click)="toggleFullScreen()" class="fullscreen-btn">Fullscreen</button>
-    <phaser-game *ngIf="isAuthSuccessful"></phaser-game>
+    <button *ngIf="isAuthSuccessful && !isPlayGame" (click)="toggleFullScreen()" class="fullscreen-btn">Play Game</button>
+    <phaser-game *ngIf="isAuthSuccessful && isPlayGame"></phaser-game>
 </div>
