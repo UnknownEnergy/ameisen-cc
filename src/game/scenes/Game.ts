@@ -167,7 +167,9 @@ export class Game extends Scene {
     }
 
     create() {
+        const scaleFactor = (this.game as any).scaleFactor;
         this.camera = this.cameras.main;
+        this.camera.setZoom(scaleFactor);
 
         // Create the tilemap from the loaded JSON file
         const map = this.make.tilemap({key: 'map'});
@@ -266,7 +268,12 @@ export class Game extends Scene {
         this.cameras.main.roundPixels = true;
 
         // Create a minimap camera
-        this.minimapCamera = this.cameras.add(10, 10, 200, 200).setZoom(0.05).setName('mini');
+        const screenWidth = this.game.scale.width;
+        const screenHeight = this.game.scale.height;
+
+        const minimapWidth = screenWidth * 0.2; // 20% of the screen width
+        const minimapHeight = screenHeight * 0.2; // 20% of the screen height
+        this.minimapCamera = this.cameras.add(10, 10, minimapWidth, minimapHeight).setZoom(0.05*scaleFactor).setName('mini');
         this.minimapCamera.startFollow(this.player);
         // Round camera position to avoid sub-pixel rendering
         // @ts-ignore

@@ -21,6 +21,7 @@ export class GoogleLoginComponent implements OnInit {
     private readonly SERVER_URI = environment.apiUrl;
     isAuthSuccessful: boolean = false;
     isPlayGame: boolean = false;
+    isLoading: boolean = false;
     @ViewChild('googleBtn', {static: true}) googleBtn: ElementRef;
 
     constructor(private http: HttpClient,
@@ -71,6 +72,8 @@ export class GoogleLoginComponent implements OnInit {
             (googleUser: { getAuthResponse: () => { (): any; new(): any; id_token: any; }
                 getBasicProfile(): any;
             }) => {
+                this.isLoading = true;
+                this.cd.detectChanges();
                 // Expose the token to the global scope
                 (window as any).authToken = googleUser.getAuthResponse().id_token;
                 // Retrieve email
@@ -82,6 +85,7 @@ export class GoogleLoginComponent implements OnInit {
                     (response) => {
                         console.log('Success:', response);
                         this.isAuthSuccessful = true;
+                        this.isLoading = false;
                         this.cd.detectChanges();
                     },
                     (error) => {
