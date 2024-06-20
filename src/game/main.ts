@@ -4,8 +4,12 @@ import {AUTO, Game} from 'phaser';
 import {Preloader} from './scenes/Preloader';
 
 
-const gameWidth = 1024; // The original width of your game
-const gameHeight = 768; // The original height of your game
+const gameWidth = isMobileDevice() ? 480 : 1280;
+const gameHeight = isMobileDevice() ? 800 : 720;
+
+function isMobileDevice() {
+    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+}
 
 const screenWidth = window.innerWidth;
 const scaleFactor = screenWidth / gameWidth;
