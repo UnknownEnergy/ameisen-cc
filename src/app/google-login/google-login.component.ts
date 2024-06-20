@@ -20,7 +20,6 @@ export class GoogleLoginComponent implements OnInit {
     private clientId: string = environment.googleClientId;
     private readonly SERVER_URI = environment.apiUrl;
     isAuthSuccessful: boolean = false;
-    isPlayGame: boolean = false;
     isLoading: boolean = false;
     @ViewChild('googleBtn', {static: true}) googleBtn: ElementRef;
 
@@ -30,27 +29,6 @@ export class GoogleLoginComponent implements OnInit {
 
     ngOnInit(): void {
         this.initGoogleAuth();
-    }
-
-    toggleFullScreen() {
-        if (document.fullscreenElement) {
-            document.exitFullscreen();
-            this.isPlayGame = false;
-            this.cd.detectChanges();
-        } else {
-            let elem = document.documentElement;
-            elem
-                .requestFullscreen({ navigationUI: "show" })
-                .then(() => {
-                    this.isPlayGame = true;
-                    this.cd.detectChanges();
-                })
-                .catch((err) => {
-                    alert(
-                        `An error occurred while trying to switch into fullscreen mode: ${err.message} (${err.name})`,
-                    );
-                });
-        }
     }
 
     initGoogleAuth() {

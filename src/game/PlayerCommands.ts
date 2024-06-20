@@ -7,24 +7,36 @@ export class PlayerCommands {
         this.speechBubble = speechBubble;
         // Maintain a list of commands and their descriptions
         this.commands = {
-            "home": {
-                description: "Teleports the player to home position.",
+            "gästeinsel": {
+                description: "Teleports the player to Gäste Insel position.",
                 action: () => player.setPosition(9600, 8960)
             },
-            "ogj": {
-                description: "Teleports the player to OGJ position.",
+            "ogjinsel": {
+                description: "Teleports the player to OGJ Insel position.",
                 action: () => player.setPosition(1731, 9998)
             },
-            "graz": {
-                description: "Teleports the player to Graz.",
-                action: () => player.setPosition(18114, 6306)
-            },
-            "bär": {
-                description: "Teleports the player to Bär.",
+            "bäreninsel": {
+                description: "Teleports the player to Bären Insel.",
                 action: () => player.setPosition(12105, 6349)
             },
-            "liebe": {
-                description: "Teleports the player to Liebe.",
+            "märcheninsel": {
+                description: "Teleports the player to Märchen Insel.",
+                action: () => player.setPosition(20661, 1382)
+            },
+            "frieden": {
+                description: "Teleports the player to Frieden.",
+                action: () => player.setPosition(1361, 7210)
+            },
+            "wind": {
+                description: "Teleports the player to Frieden.",
+                action: () => player.setPosition(23106, 2015)
+            },
+            "hawai": {
+                description: "Teleports the player to Hawai.",
+                action: () => player.setPosition(20165, 8777)
+            },
+            "liebesinsel": {
+                description: "Teleports the player to Liebesinsel.",
                 action: () => player.setPosition(3211, 4423)
             },
             "exil": {
