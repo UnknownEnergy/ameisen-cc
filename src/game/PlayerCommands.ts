@@ -1,9 +1,11 @@
+import {Scene} from "phaser";
+
 export class PlayerCommands {
 
     speechBubble: any;
     commands: any;
 
-    constructor(player: any, speechBubble: any,) {
+    constructor(player: any, speechBubble: any, scene: any) {
         this.speechBubble = speechBubble;
         // Maintain a list of commands and their descriptions
         this.commands = {
@@ -57,6 +59,10 @@ export class PlayerCommands {
             "position": {
                 description: "Displays the player's current position.",
                 action: () => speechBubble.setText(`x: ${player.x} y: ${player.y}`)
+            },
+            "inventory": {
+                description: "Displays the player's inventory.",
+                action: () => scene.createInventory()
             }
         };
     }

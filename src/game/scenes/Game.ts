@@ -5,409 +5,251 @@ import {PlayerCommands} from "../PlayerCommands";
 import axios from "axios";
 import {environment} from '../../environments/environment';
 
-export class Game extends Scene {
-    camera: Phaser.Cameras.Scene2D.Camera;
-    minimapCamera: Phaser.Cameras.Scene2D.Camera;
-    player: Phaser.Physics.Arcade.Image;
-    private playerNameText: Phaser.GameObjects.Text;
-    playerSpeed: number;  // Speed at which the world moves
-    targetPosition: Phaser.Math.Vector2 | null; // Target position to move towards
-    gridSize: number;
-    cursors: Phaser.Types.Input.Keyboard.CursorKeys;
-    groundLayer: Phaser.Tilemaps.TilemapLayer;
-    waterLayer: Phaser.Tilemaps.TilemapLayer;
-    treeLayer: Phaser.Tilemaps.TilemapLayer;
+class Player {
+    sprite: Phaser.Physics.Arcade.Sprite;
+    nameText: Phaser.GameObjects.Text;
     speechBubble: SpeechBubble;
-    typedText: string = '';
-    playerCommands: PlayerCommands;
+
+    constructor(scene: Scene, x: number, y: number, texture: string, frame: string | number) {
+        this.sprite = scene.physics.add.sprite(x, y, texture, frame).setOrigin(0.5, 1);
+        this.nameText = scene.add.text(x, y - 105, '', {fontSize: '16px'}).setOrigin(0.5);
+        this.speechBubble = new SpeechBubble(scene, x, y - 120);
+
+        // @ts-ignore
+        this.sprite.body.setSize(this.sprite.width / 2, 20);
+        // @ts-ignore
+        this.sprite.body.setOffset(this.sprite.width / 4, this.sprite.height - 20);
+    }
+
+    update() {
+        const {x, y} = this.sprite;
+        this.nameText.setPosition(x, y - 105);
+        this.speechBubble.setPosition(x, y - 120);
+    }
+}
+
+class InventoryManager {
+    private scene: Scene;
+    private readonly gridSize: number;
+    slots: { x: number; y: number; occupied: boolean; item: any }[] = [];
+    private player: Player;
+
+    constructor(scene: Phaser.Scene, gridSize: number, player: Player) {
+        this.scene = scene;
+        this.gridSize = gridSize;
+        this.player = player;
+        this.createGrid(player.sprite.x, player.sprite.y);
+        this.createSellArea();
+    }
+
+    createGrid(startX: number, startY: number) {
+        for (let y = 0; y < 4; y++) {
+            for (let x = 0; x < 5; x++) {
+                const slotX = startX + (x * this.gridSize);
+                const slotY = startY + (y * this.gridSize);
+                const slot = this.scene.add.rectangle(slotX, slotY, this.gridSize, this.gridSize, 0x0000ff);
+                slot.setStrokeStyle(2, 0xffffff);
+                slot.setInteractive();
+                slot.setData('inventorySlot', true);
+
+                this.slots.push({x: slotX, y: slotY, occupied: false, item: null});
+            }
+        }
+    }
+
+    addItem(item: Phaser.Physics.Arcade.Sprite) {
+        const existingSlot = this.slots.find(slot => slot === item.getData('inventorySlot'));
+        const emptySlot = existingSlot ? existingSlot : this.slots.find(slot => !slot.occupied);
+        if (emptySlot) {
+            item.setPosition(emptySlot.x, emptySlot.y);
+            item.setImmovable(true);
+            emptySlot.occupied = true;
+            emptySlot.item = item;
+            item.setData('inventorySlot', emptySlot);
+        }
+    }
+
+    createSellArea() {
+        const sellAreaX = this.player.sprite.x + (5 * this.gridSize) + 50;
+        const sellAreaY = this.player.sprite.y;
+        const sellArea = this.scene.add.rectangle(sellAreaX, sellAreaY, this.gridSize, this.gridSize, 0xff0000);
+        sellArea.setInteractive().setData('sellArea', true);
+    }
+}
+
+export class Game extends Scene {
+    private player: Player;
+    private inventoryManager: InventoryManager;
     private chests: Phaser.Physics.Arcade.Group;
     private items: Phaser.Physics.Arcade.Group;
-    private otherPlayers: {
-        [key: string]: {
-            sprite: Phaser.Physics.Arcade.Image,
-            speechBubble: SpeechBubble,
-            playerNameText: Phaser.GameObjects.Text
-        }
-    } = {};
+    private itemMap: Map<string, { item: Phaser.Physics.Arcade.Sprite, text: Phaser.GameObjects.Text }> = new Map();
+    private otherPlayers: { [key: string]: Player } = {};
     private readonly SERVER_URI = environment.apiUrl;
-    private delay = 500;
-    private delay2 = 3000;
-    private lastFetchTime = 0;
-    private lastFetchTime2 = 0;
+    private targetPosition: Phaser.Math.Vector2 | null = null;
+    private playerSpeed = 900;
+    private gridSize = 64;
+    private typedText = '';
+    private inputField: HTMLInputElement;
+
+    private groundLayer?: Phaser.Tilemaps.TilemapLayer;
+    private waterLayer?: Phaser.Tilemaps.TilemapLayer;
+    private treeLayer?: Phaser.Tilemaps.TilemapLayer;
 
     constructor() {
         super('Game');
-        this.playerSpeed = 900;  // Set player speed (adjust as necessary)
-        this.targetPosition = null; // Initially, no target position
-        this.gridSize = 64; // Size of each grid cell
     }
 
-    async preload() {
-        await this.initializePlayersPosition();
+    async create() {
+        this.createMap();
+        this.initializePlayer()
+        EventBus.emit('current-scene-ready', this);
     }
 
-    private async initializePlayersPosition() {
-        try {
-            const response = await axios.get(this.SERVER_URI + '/players', {
-                headers: {
-                    // @ts-ignore
-                    Authorization: `Bearer ${(window).authToken}`
-                }
-            });
-            const players = response.data;
-            players.forEach((player: { player_id: any; x: number; y: number; skin: string | number | Phaser.Textures.Frame; }) => {
-                // @ts-ignore
-                if (player.player_id === window.email) {
-                    // If own player, initialize last position
-                    this.player.x = player.x;
-                    this.player.y = player.y;
-                    this.player.setFrame(player.skin);
-                }
-            });
-        } catch (error) {
-            console.error('Error fetching players data:', error);
-        }
-    }
-
-    private async fetchChestsData() {
-        try {
-            const response = await axios.get(this.SERVER_URI + '/chests', {
-                headers: {
-                    // @ts-ignore
-                    Authorization: `Bearer ${(window.authToken)}`
-                }
-            });
-
-            const chests = response.data;
-            this.renderChests(chests);
-        } catch (error) {
-            console.error('Failed to fetch chests data', error);
-        }
-    }
-
-    renderChests(chests: any[]) {
-        chests.forEach(chestData => {
-            const chest = this.chests.create(chestData.x, chestData.y, 'chest', 0);
-            chest.setData('id', chestData.id);
-            chest.setImmovable(true);
-            chest.setInteractive();
-
-            if (chestData.is_open) {
-                chest.setFrame(1);
-            }
-        });
-    }
-
-    private async fetchItemsData() {
-        try {
-            const response = await axios.get(this.SERVER_URI + '/items', {
-                headers: {
-                    // @ts-ignore
-                    Authorization: `Bearer ${(window.authToken)}`
-                }
-            });
-
-            const items = response.data;
-            this.renderItems(items);
-        } catch (error) {
-            console.error('Failed to fetch chests data', error);
-        }
-    }
-
-    private itemMap: Map<any, { item: Phaser.Physics.Arcade.Sprite, text: Phaser.GameObjects.Text }> = new Map();
-
-    renderItems(items: any[]) {
-        items.forEach((itemData: any) => {
-            if (this.itemMap.has(itemData.id)) {
-                // Update the existing item and text
-                const {item, text} = this.itemMap.get(itemData.id)!;
-                item.setPosition(itemData.x, itemData.y);
-                text.setPosition(itemData.x, itemData.y - 30).setText('Item of\n' + (window as any).email);
-            } else {
-                // Create new item and text
-                const item = this.items.create(itemData.x, itemData.y, 'items', itemData.frame);
-                item.setData('id', itemData.id);
-                item.setImmovable(true);
-
-                // Enable input on the item
-                item.setInteractive();
-
-                if (itemData.player_id === (window as any).email) {
-                    this.input.setDraggable(item);
-                    item.on('drag', (pointer: any, dragX: any, dragY: any) => {
-                        item.x = dragX;
-                        item.y = dragY;
-                    });
-                    item.on('dragend', (pointer: any, dragX: any, dragY: any, dropped: any) => {
-                        this.updateItemPosition(itemData.id, item.x, item.y);
-                    });
-                }
-
-                const text = this.add.text(itemData.x, itemData.y - 30, 'Item of\n' + (window as any).email, {
-                    fontSize: '10px',
-                    align: 'center'
-                }).setOrigin(0.5);
-
-                // Store the new item and text in the map
-                this.itemMap.set(itemData.id, {item, text});
-            }
-        });
-    }
-
-    updateItemPosition(itemId: any, x: any, y: any) {
-        // Send a request to the server to update item position
-        axios.put(this.SERVER_URI + `/items/${itemId}`, {x, y}, {
-            headers: {
-                // @ts-ignore
-                Authorization: `Bearer ${(window.authToken)}`
-            }
-        }).catch(error => {
-            console.error('Error updating item position:', error);
-        });
-    }
-
-    create() {
-        const scaleFactor = (this.game as any).scaleFactor;
-        this.camera = this.cameras.main;
-        this.camera.setZoom(scaleFactor);
-
-        // Create the tilemap from the loaded JSON file
+    createMap() {
         const map = this.make.tilemap({key: 'map'});
-
-        // Add the tileset image to the map
         const tileset = map.addTilesetImage('tileset', 'blocks', 64, 64, 0, 0);
 
-        // Create layers from the map
-        // @ts-ignore
-        this.groundLayer = map.createLayer('ground', tileset, 0, 0);
-        // @ts-ignore
-        this.waterLayer = map.createLayer('water', tileset, 0, 0);
-        // Set collision for all tiles in the waterLayer
-        this.waterLayer.setCollisionByExclusion([-1]);
-        // @ts-ignore
-        this.treeLayer = map.createLayer('tree', tileset, 0, 0);
-        // Set collision for all tiles in the treeLayer
-        this.treeLayer.setCollisionByExclusion([-1]);
+        if (!tileset) {
+            console.error('Failed to load tileset');
+            return;
+        }
 
-        // Create a group to hold all chests
-        this.chests = this.physics.add.group({
-            immovable: true,
-            allowGravity: false
+        // Create layers
+        const groundLayer = map.createLayer('ground', tileset, 0, 0);
+        const waterLayer = map.createLayer('water', tileset, 0, 0);
+        const treeLayer = map.createLayer('tree', tileset, 0, 0);
+
+        if (!groundLayer || !waterLayer || !treeLayer) {
+            console.error('Failed to create one or more layers');
+            return;
+        }
+
+        // Set collision for water and tree layers
+        waterLayer.setCollisionByExclusion([-1]);
+        treeLayer.setCollisionByExclusion([-1]);
+
+        // Store references to layers if needed later
+        this.groundLayer = groundLayer;
+        this.waterLayer = waterLayer;
+        this.treeLayer = treeLayer;
+    }
+
+    async fetchInitialPlayerData(): Promise<{ x: number; y: number; skin: string }> {
+        try {
+            const response = await axios.get(`${this.SERVER_URI}/players`, {
+                headers: {Authorization: `Bearer ${(window as any).authToken}`}
+            });
+            const players = response.data;
+            const playerData = players.find((p: any) => p.player_id === (window as any).email);
+            if (playerData) {
+                return {x: playerData.x, y: playerData.y, skin: playerData.skin};
+            }
+        } catch (error) {
+            console.error('Error fetching initial player data:', error);
+        }
+        // Return default values if fetch fails
+        return {x: this.gridSize * 150, y: this.gridSize * 140, skin: '0'};
+    }
+
+    initializePlayer() {
+        this.fetchInitialPlayerData().then(({x, y, skin}) => {
+            this.player = new Player(this, x, y, 'player', skin);
+            this.player.nameText.setText((window as any).email);
+
+            // Add colliders
+            if (this.waterLayer) {
+                this.physics.add.collider(this.player.sprite, this.waterLayer);
+            }
+            if (this.treeLayer) {
+                this.physics.add.collider(this.player.sprite, this.treeLayer);
+            }
+            if (this.chests) {
+                this.physics.add.collider(this.player.sprite, this.chests);
+            }
+
+            // Once the player is created, set up the camera to follow
+            this.setupCamera();
+
+            // Emit an event or call a method to indicate player is ready
+            this.onPlayerReady();
+        }).catch(error => {
+            console.error('Error creating player:', error);
+            // Create a player with default values
+            this.player = new Player(this, this.gridSize * 150, this.gridSize * 140, 'player', '0');
+            this.player.nameText.setText((window as any).email);
+            this.setupCamera();
+            this.onPlayerReady();
         });
+    }
 
-        // Create a group to hold all items
-        this.items = this.physics.add.group({
-            immovable: true,
-            allowGravity: false
-        });
+    setupCamera() {
+        const scaleFactor = (this.game as any).scaleFactor;
+        this.cameras.main.startFollow(this.player.sprite).setZoom(scaleFactor);
 
-        // Add the player image at the spawn position and enable physics
-        this.player = this.physics.add.sprite(this.gridSize * 150, this.gridSize * 140, 'player', 0)
-            .setOrigin(0.5, 1);  // Set the origin to bottom center
+        const {width, height} = this.scale;
+        const minimapWidth = width * 0.2;
+        const minimapHeight = height * 0.2;
+        this.cameras.add(10, 10, minimapWidth, minimapHeight)
+            .setZoom(0.05 * scaleFactor)
+            .setName('mini')
+            .startFollow(this.player.sprite);
+    }
 
-        // Create text object for the player name
-        this.playerNameText = this.add.text(this.player.x, this.player.y - 120, (window as any).email, {
-            fontSize: '16px',
-        }).setOrigin(0.5);
+    onPlayerReady() {
+        this.createChests();
+        this.createItems();
+        this.createInputListeners();
+        this.createNetworkListeners();
+    }
 
-        this.physics.add.collider(this.player, this.chests);
+    createChests() {
+        this.chests = this.physics.add.group({immovable: true, allowGravity: false});
+    }
 
-        // Adjust the player's physics body offset and size.
-        // @ts-ignore
-        this.player.body.setSize(this.player.width / 2, 20);  // Set the size of the collider
-        // @ts-ignore
-        this.player.body.setOffset(this.player.width / 4, this.player.height - 20);  // Adjust the offset to align the collider to the bottom
+    createItems() {
+        this.items = this.physics.add.group({immovable: true, allowGravity: false});
+    }
 
-        // Add collision between player and treeLayer
-        this.physics.add.collider(this.player, this.treeLayer);
-        // Add collision between player and waterLayer
-        this.physics.add.collider(this.player, this.waterLayer);
+    createInventory() {
+        this.inventoryManager = new InventoryManager(this, this.gridSize, this.player);
+    }
 
-        // Add input listener for mouse click or touch
+    createInputListeners() {
         this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
             this.targetPosition = new Phaser.Math.Vector2(pointer.worldX, pointer.worldY);
         });
 
-        // Add click event listener for chests
         this.input.on('gameobjectdown', (pointer: any, gameObject: any) => {
-            if (gameObject.texture.key === 'chest' && gameObject.frame.name !== 1) {
-                // @ts-ignore
+            if (gameObject.texture?.key === 'chest' && gameObject.frame.name !== 1) {
                 const chestId = gameObject.getData('id');
-                gameObject.setFrame(1); // Change the frame to 1
-                axios.put(this.SERVER_URI + '/chests/' + chestId + '/open', {}, {
-                    headers: {
-                        Authorization: `Bearer ${(window as any).authToken}`
-                    }
-                });
+                gameObject.setFrame(1);
+                this.openChest(chestId);
             }
         });
 
-        // Add touch event listener for long press or touch
+        // @ts-ignore
+        this.input.keyboard.on('keydown', this.handleKeyDown, this);
+
         this.input.on('pointerdown', this.onPointerDown, this);
         this.input.on('pointerup', this.onPointerUp, this);
         this.input.on('pointermove', this.onPointerMove, this);
 
-        // Create an HTML input element (hidden initially)
         this.createInputField();
-
-        // Optional: Add keyboard input for debugging
-        // @ts-ignore
-        this.cursors = this.input.keyboard.createCursorKeys();
-
-        // Create the speech bubble
-        this.speechBubble = new SpeechBubble(this, this.player.x, this.player.y - 100);
-
-        // Add keyboard input for typing text
-        // @ts-ignore
-        this.input.keyboard.on('keydown', this.handleTyping, this);
-        this.playerCommands = new PlayerCommands(this.player, this.speechBubble);
-
-        // Make the camera follow the player instantly
-        this.camera.startFollow(this.player);
-        // Round camera position to avoid sub-pixel rendering
-        this.cameras.main.roundPixels = true;
-
-        // Create a minimap camera
-        const screenWidth = this.game.scale.width;
-        const screenHeight = this.game.scale.height;
-
-        const minimapWidth = screenWidth * 0.2; // 20% of the screen width
-        const minimapHeight = screenHeight * 0.2; // 20% of the screen height
-        this.minimapCamera = this.cameras.add(10, 10, minimapWidth, minimapHeight).setZoom(0.05*scaleFactor).setName('mini');
-        this.minimapCamera.startFollow(this.player);
-        // Round camera position to avoid sub-pixel rendering
-        // @ts-ignore
-        this.cameras.getCamera('mini').roundPixels = true;
-
-        EventBus.emit('current-scene-ready', this);
     }
 
-    override update(time: number, delta: number) {
-        if (this.targetPosition) {
-            this.handlePlayerMovement(delta);
-        }
-
-        // Sync the minimap camera with the main camera
-        this.minimapCamera.scrollX = this.camera.scrollX;
-        this.minimapCamera.scrollY = this.camera.scrollY;
-
-        // Update player name text position
-        this.playerNameText.setPosition(this.player.x, this.player.y - 105);
-
-        // Update speech bubble position to follow the player
-        this.speechBubble.setPosition(this.player.x, this.player.y - 120);
-
-        const currentTime = Date.now();
-        // Check if the delay time has passed since the last fetch
-        if (currentTime - this.lastFetchTime >= this.delay) {
-            this.sendPlayerData(this.player.x, this.player.y, this.player.frame.name, this.speechBubble.text.text);
-            // Fetch and render other players
-            this.fetchAndRenderPlayers();
-            // Send the player data to the server
-            this.lastFetchTime = currentTime; // Update the last fetch time
-        }
-
-        if (currentTime - this.lastFetchTime2 >= this.delay2) {
-            this.fetchChestsData();
-            this.fetchItemsData();
-            this.lastFetchTime2 = currentTime; // Update the last fetch time
-        }
-    }
-
-    private handlePlayerMovement(delta: number) {
-        // @ts-ignore
-        const direction = this.targetPosition.clone().subtract(new Phaser.Math.Vector2(this.player.x, this.player.y));
-        const distance = direction.length();
-
-        if (distance > this.playerSpeed * delta / 1000) {  // If the distance is greater than the step size
-            direction.normalize();
-            const offsetX = direction.x * this.playerSpeed * delta / 1000;
-            const offsetY = direction.y * this.playerSpeed * delta / 1000;
-
-            const nextPlayerX = this.player.x + offsetX;
-            const nextPlayerY = this.player.y + offsetY;
-
-            // Move the player using physics to handle collisions
-            this.physics.moveTo(this.player, nextPlayerX, nextPlayerY, this.playerSpeed);
-        } else {
-            this.targetPosition = null;  // Stop moving
-            // @ts-ignore
-            this.player.body.setVelocity(0);  // Stop the player
-        }
-    }
-
-    async fetchAndRenderPlayers() {
-        try {
-            const response = await axios.get(this.SERVER_URI + '/players', {
-                headers: {
-                    Authorization: `Bearer ${(window as any).authToken}`
-                }
-            });
-            const players = response.data;
-
-            players.forEach((player: { player_id: string; x: number; y: number; skin: string; chat: string }) => {
-                if (player.player_id !== (window as any).email) {
-                    let otherPlayer = this.otherPlayers[player.player_id];
-                    if (!otherPlayer) {
-                        const sprite = this.physics.add.sprite(player.x, player.y, 'player', player.skin)
-                            .setOrigin(0.5, 1);  // Set the origin to bottom center
-                        const speechBubble = new SpeechBubble(this, player.x, player.y - 120);
-                        speechBubble.setText(player.chat);
-                        speechBubble.show();
-
-                        // Create text object for other player name
-                        const playerNameText = this.add.text(player.x, player.y - 105, player.player_id, {
-                            fontSize: '16px'
-                        }).setOrigin(0.5);
-
-                        this.otherPlayers[player.player_id] = {sprite, speechBubble, playerNameText};
-                    } else {
-                        otherPlayer.sprite.setPosition(player.x, player.y);
-                        otherPlayer.sprite.setFrame(player.skin);
-                        otherPlayer.speechBubble.setPosition(player.x, player.y - 120);
-                        otherPlayer.speechBubble.setText(player.chat);
-                        otherPlayer.playerNameText.setPosition(player.x, player.y - 105);
-                        if (player.chat) {
-                            otherPlayer.speechBubble.show();
-                        } else {
-                            otherPlayer.speechBubble.hide();
-                        }
-                    }
-                }
-            });
-        } catch (error) {
-            console.error('Error fetching players data:', error);
-        }
-    }
-
-    async sendPlayerData(x: number, y: number, skin: string, chat: String) {
-        try {
-            await axios.post(this.SERVER_URI + '/player', {x, y, skin, chat}, {
-                headers: {
-                    Authorization: `Bearer ${(window as any).authToken}`
-                }
-            });
-        } catch (error) {
-            console.error('Error sending player data:', error);
-        }
-    }
-
-    handleTyping(event: KeyboardEvent) {
+    private handleKeyDown(event: KeyboardEvent) {
         if (event.key === 'Enter') {
-            // Change bubble color to white and start timer to hide it
-            this.speechBubble.setText(this.typedText, 0xffffff);
-            this.playerCommands.executeCommand(this.typedText);
-            this.speechBubble.startTypingTimer();
-            this.typedText = '';  // Clear typed text
+            this.player.speechBubble.setText(this.typedText, 0xffffff);
+            new PlayerCommands(this.player.sprite, this.player.speechBubble, this).executeCommand(this.typedText);
+            this.player.speechBubble.startTypingTimer();
+            this.typedText = '';
         } else if (event.key === 'Backspace') {
-            // Remove last character
             this.typedText = this.typedText.slice(0, -1);
-            this.speechBubble.setText(this.typedText);
+            this.player.speechBubble.setText(this.typedText);
         } else if (event.key.length === 1) {
-            // Append character to text
             this.typedText += event.key;
-            this.speechBubble.setText(this.typedText);
-            this.speechBubble.show();
+            this.player.speechBubble.setText(this.typedText);
+            this.player.speechBubble.show();
         }
     }
 
@@ -415,7 +257,7 @@ export class Game extends Scene {
     private longPressDuration: number = 500;
 
     private onPointerDown(pointer: Phaser.Input.Pointer) {
-        if (this.player.getBounds().contains(pointer.worldX, pointer.worldY)) {
+        if (this.player.sprite.getBounds().contains(pointer.worldX, pointer.worldY)) {
             this.pointerDownTime = this.time.now;
         }
     }
@@ -423,7 +265,7 @@ export class Game extends Scene {
     private onPointerUp(pointer: Phaser.Input.Pointer) {
         if (this.pointerDownTime > 0) {
             const duration = this.time.now - this.pointerDownTime;
-            if (duration >= this.longPressDuration && this.player.getBounds().contains(pointer.worldX, pointer.worldY)) {
+            if (duration >= this.longPressDuration && this.player.sprite.getBounds().contains(pointer.worldX, pointer.worldY)) {
                 this.showInputField();
             }
             this.pointerDownTime = 0;
@@ -433,64 +275,245 @@ export class Game extends Scene {
     private onPointerMove(pointer: Phaser.Input.Pointer) {
         if (this.pointerDownTime > 0) {
             const duration = this.time.now - this.pointerDownTime;
-            if (duration >= this.longPressDuration && this.player.getBounds().contains(pointer.worldX, pointer.worldY)) {
+            if (duration >= this.longPressDuration && this.player.sprite.getBounds().contains(pointer.worldX, pointer.worldY)) {
                 this.showInputField();
                 this.pointerDownTime = 0;
             }
         }
     }
 
-    private inputField: HTMLInputElement;
-
-    private createInputField() {
-        this.inputField = document.createElement('input');
-        this.inputField.type = 'text';
-        this.inputField.style.position = 'absolute';
-        this.inputField.style.top = '-100px';  // Hide it initially
-        this.inputField.style.left = '-100px';
-        this.inputField.style.opacity = '0';
-        document.body.appendChild(this.inputField);
-
-        // Add event listener to handle input
-        this.inputField.addEventListener('input', (event) => {
-            this.typedText = this.inputField.value;
-            this.speechBubble.setText(this.typedText);
-            this.speechBubble.show();
+    createNetworkListeners() {
+        this.time.addEvent({
+            delay: 500,
+            callback: () => {
+                this.sendPlayerData();
+                this.fetchAndRenderPlayers();
+            },
+            callbackScope: this,
+            loop: true
         });
 
-        // Add event listener to handle 'Enter' key
-        this.inputField.addEventListener('keydown', (event) => {
-            if (event.key === 'Enter') {
-                this.speechBubble.setText(this.typedText, 0xffffff);
-                this.playerCommands.executeCommand(this.typedText);
-                this.speechBubble.startTypingTimer();
-                this.inputField.value = '';
-                this.hideInputField();
-            } else if (event.key === 'Backspace') {
-                // Sync backspace with speech bubble text
-                this.typedText = this.typedText.slice(0, -1);
-                this.speechBubble.setText(this.typedText);
+        this.time.addEvent({
+            delay: 3000,
+            callback: () => {
+                this.fetchChestsData();
+                this.fetchItemsData();
+            },
+            callbackScope: this,
+            loop: true
+        });
+    }
+
+    override update(time: number, delta: number) {
+        this.handlePlayerMovement(delta);
+        this.player?.update();
+        this.updateOtherPlayers();
+    }
+
+    handlePlayerMovement(delta: number) {
+        if (this.targetPosition) {
+            const direction = this.targetPosition.clone().subtract(new Phaser.Math.Vector2(this.player.sprite.x, this.player.sprite.y));
+            const distance = direction.length();
+
+            if (distance > this.playerSpeed * delta / 1000) {
+                direction.normalize();
+                const nextPlayerX = this.player.sprite.x + direction.x * this.playerSpeed * delta / 1000;
+                const nextPlayerY = this.player.sprite.y + direction.y * this.playerSpeed * delta / 1000;
+                this.physics.moveTo(this.player.sprite, nextPlayerX, nextPlayerY, this.playerSpeed);
+            } else {
+                this.targetPosition = null;
+                // @ts-ignore
+                this.player.sprite.body.setVelocity(0);
+            }
+        }
+    }
+
+    updateOtherPlayers() {
+        Object.values(this.otherPlayers).forEach(player => player.update());
+    }
+
+    async fetchAndRenderPlayers() {
+        try {
+            const response = await axios.get(`${this.SERVER_URI}/players`, {
+                headers: {Authorization: `Bearer ${(window as any).authToken}`}
+            });
+            const players = response.data;
+
+            players.forEach((playerData: { player_id: string; x: number; y: number; skin: string; chat: string }) => {
+                if (playerData.player_id !== (window as any).email) {
+                    let otherPlayer = this.otherPlayers[playerData.player_id];
+                    if (!otherPlayer) {
+                        otherPlayer = new Player(this, playerData.x, playerData.y, 'player', playerData.skin);
+                        otherPlayer.nameText.setText(playerData.player_id);
+                        this.otherPlayers[playerData.player_id] = otherPlayer;
+                    } else {
+                        otherPlayer.sprite.setPosition(playerData.x, playerData.y);
+                        otherPlayer.sprite.setFrame(playerData.skin);
+                    }
+                    otherPlayer.speechBubble.setText(playerData.chat);
+                    playerData.chat ? otherPlayer.speechBubble.show() : otherPlayer.speechBubble.hide();
+                }
+            });
+        } catch (error) {
+            console.error('Error fetching players data:', error);
+        }
+    }
+
+    async fetchChestsData() {
+        try {
+            const response = await axios.get(`${this.SERVER_URI}/chests`, {
+                headers: {Authorization: `Bearer ${(window as any).authToken}`}
+            });
+            this.renderChests(response.data);
+        } catch (error) {
+            console.error('Failed to fetch chests data', error);
+        }
+    }
+
+    renderChests(chests: any[]) {
+        chests.forEach(chestData => {
+            const chest = this.chests.create(chestData.x, chestData.y, 'chest', chestData.is_open ? 1 : 0);
+            chest.setData('id', chestData.id).setImmovable(true).setInteractive();
+        });
+    }
+
+    async fetchItemsData() {
+        try {
+            const response = await axios.get(`${this.SERVER_URI}/items`, {
+                headers: {Authorization: `Bearer ${(window as any).authToken}`}
+            });
+            this.renderItems(response.data);
+        } catch (error) {
+            console.error('Failed to fetch items data', error);
+        }
+    }
+
+    renderItems(items: any[]) {
+        items.forEach(itemData => {
+            if (itemData.in_inventory === 1 && (itemData.player_id !== (window as any).email)) {
+                return; //skip rendering inventory items of other players
+            }
+
+            let itemAndText = this.itemMap.get(itemData.id);
+            if (!itemAndText) {
+                const item = this.items.create(itemData.x, itemData.y, 'items', itemData.frame) as Phaser.Physics.Arcade.Sprite;
+                item.setData('id', itemData.id).setImmovable(true).setInteractive();
+
+                const text = this.add.text(itemData.x, itemData.y - 30, `Item of\n${itemData.player_id}`, {
+                    fontSize: '10px',
+                    align: 'center'
+                }).setOrigin(0.5);
+
+                itemAndText = {item, text};
+                this.itemMap.set(itemData.id, itemAndText);
+
+                if (itemData.player_id === (window as any).email) {
+                    this.setupItemDrag(item);
+                }
+            } else {
+                itemAndText.item.setPosition(itemData.x, itemData.y);
+                itemAndText.text.setPosition(itemData.x, itemData.y - 30).setText(`Item of\n${itemData.player_id}`);
+            }
+
+            if (itemData.in_inventory === 1) {
+                itemAndText.text.text = '';
+                this.inventoryManager?.addItem(itemAndText.item);
             }
         });
     }
 
-    private showInputField() {
-        const rect = this.game.canvas.getBoundingClientRect();
-        const gameWidth = this.game.scale.width;
-        const gameHeight = this.game.scale.height;
+    setupItemDrag(item: Phaser.Physics.Arcade.Sprite) {
+        this.input.setDraggable(item);
+        item.on('drag', (pointer: any, dragX: any, dragY: any) => {
+            item.x = dragX;
+            item.y = dragY;
+            const text = this.itemMap.get(item.getData('id'))?.text;
+            if (text) {
+                text.x = dragX;
+                text.y = dragY - 30;
+            }
+        });
+        item.on('dragend', (pointer: any, dragX: any, dragY: any) => {
+            const droppedOnInventorySlot = this.inventoryManager?.slots.some(slot =>
+                Phaser.Geom.Rectangle.Contains(
+                    new Phaser.Geom.Rectangle(slot.x - this.gridSize / 2, slot.y - this.gridSize / 2, this.gridSize, this.gridSize),
+                    item.x,
+                    item.y
+                )
+            );
+            this.updateItemPosition(item.getData('id'), item.x, item.y, droppedOnInventorySlot ? 1 : 0);
+        });
+    }
 
+    updateItemPosition(itemId: string, x: number, y: number, inInventory: number) {
+        axios.put(`${this.SERVER_URI}/items/${itemId}`, {x, y, in_inventory: inInventory}, {
+            headers: {Authorization: `Bearer ${(window as any).authToken}`}
+        }).catch(error => console.error('Error updating item position:', error));
+
+        const text = this.itemMap.get(itemId)?.text;
+        if (text) {
+            text.setPosition(x, y - 30);
+        }
+    }
+
+    openChest(chestId: string) {
+        axios.put(`${this.SERVER_URI}/chests/${chestId}/open`, {}, {
+            headers: {Authorization: `Bearer ${(window as any).authToken}`}
+        });
+    }
+
+    sendPlayerData() {
+        const {x, y} = this.player.sprite;
+        const skin = this.player.sprite.frame.name;
+        const chat = this.player.speechBubble.text.text;
+        axios.post(`${this.SERVER_URI}/player`, {x, y, skin, chat}, {
+            headers: {Authorization: `Bearer ${(window as any).authToken}`}
+        }).catch(error => console.error('Error sending player data:', error));
+    }
+
+    createInputField() {
+        this.inputField = document.createElement('input');
+        this.inputField.type = 'text';
+        this.inputField.style.position = 'absolute';
+        this.inputField.style.top = '-100px';
+        this.inputField.style.left = '-100px';
+        this.inputField.style.opacity = '0';
+        document.body.appendChild(this.inputField);
+
+        this.inputField.addEventListener('input', () => {
+            this.typedText = this.inputField.value;
+            this.player.speechBubble.setText(this.typedText);
+            this.player.speechBubble.show();
+        });
+
+        this.inputField.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter') {
+                this.player.speechBubble.setText(this.typedText, 0xffffff);
+                new PlayerCommands(this.player.sprite, this.player.speechBubble, this).executeCommand(this.typedText);
+                this.player.speechBubble.startTypingTimer();
+                this.inputField.value = '';
+                this.hideInputField();
+            } else if (event.key === 'Backspace') {
+                this.typedText = this.typedText.slice(0, -1);
+                this.player.speechBubble.setText(this.typedText);
+            }
+        });
+    }
+
+    showInputField() {
+        const rect = this.game.canvas.getBoundingClientRect();
+        const {width, height} = this.scale;
         const inputFieldWidth = this.inputField.offsetWidth;
         const inputFieldHeight = this.inputField.offsetHeight;
-
-        const x = rect.left + (gameWidth - inputFieldWidth) / 2;
-        const y = rect.top + (gameHeight - inputFieldHeight) / 2;
+        const x = rect.left + (width - inputFieldWidth) / 2;
+        const y = rect.top + (height - inputFieldHeight) / 2;
         this.inputField.style.top = `${y}px`;
         this.inputField.style.left = `${x}px`;
         this.inputField.style.opacity = '1';
         this.inputField.focus();
     }
 
-    private hideInputField() {
+    hideInputField() {
         this.inputField.style.opacity = '0';
         this.inputField.blur();
     }
