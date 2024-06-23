@@ -312,6 +312,7 @@ export class Game extends Scene {
     onPlayerReady() {
         this.createChests();
         this.createInventory();
+        this.inventoryManager.open();
         this.createItems();
         this.createInputListeners();
         this.createNetworkListeners();
