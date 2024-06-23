@@ -34,7 +34,7 @@ class InventoryManager {
     slots: { x: number; y: number; occupied: boolean; item: any }[] = [];
     private player: Player;
     isOpen: boolean = false;
-    private inventoryContainer: Phaser.GameObjects.Container;
+    inventoryContainer: Phaser.GameObjects.Container;
     private moneyText: Phaser.GameObjects.Text;
 
     constructor(scene: Phaser.Scene, gridSize: number, player: Player) {
@@ -315,6 +315,14 @@ export class Game extends Scene {
         this.createItems();
         this.createInputListeners();
         this.createNetworkListeners();
+        // Set the rendering order of game objects
+        this.inventoryManager.inventoryContainer.setDepth(4);
+        this.player.sprite.setDepth(3);
+        Object.values(this.otherPlayers).forEach((player) => {
+            player.sprite.setDepth(2);
+        });
+        this.items.setDepth(1);
+        this.chests.setDepth(0);
     }
 
     createChests() {
