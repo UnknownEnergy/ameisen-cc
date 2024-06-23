@@ -56,13 +56,13 @@ export class PlayerCommands {
                     player.setFrame(skinNumber);
                 }
             },
-            "position": {
+            "p": {
                 description: "Displays the player's current position.",
                 action: () => speechBubble.setText(`x: ${player.x} y: ${player.y}`)
             },
-            "inventory": {
+            "i": {
                 description: "Displays the player's inventory.",
-                action: () => scene.createInventory()
+                action: () => scene.inventoryManager.toggle()
             }
         };
     }

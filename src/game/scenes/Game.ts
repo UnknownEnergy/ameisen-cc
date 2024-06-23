@@ -33,13 +33,17 @@ class InventoryManager {
     private readonly gridSize: number;
     slots: { x: number; y: number; occupied: boolean; item: any }[] = [];
     private player: Player;
+    isOpen: boolean = false;
+    private inventoryContainer: Phaser.GameObjects.Container;
 
     constructor(scene: Phaser.Scene, gridSize: number, player: Player) {
         this.scene = scene;
         this.gridSize = gridSize;
         this.player = player;
+        this.inventoryContainer = this.scene.add.container(0, 0);
         this.createGrid(player.sprite.x, player.sprite.y);
         this.createSellArea();
+        this.close(); // Start with the inventory closed
     }
 
     createGrid(startX: number, startY: number) {
@@ -51,13 +55,25 @@ class InventoryManager {
                 slot.setStrokeStyle(2, 0xffffff);
                 slot.setInteractive();
                 slot.setData('inventorySlot', true);
+                slot.setName(`inventorySlot_${y * 5 + x}`);
 
+                this.inventoryContainer.add(slot);
                 this.slots.push({x: slotX, y: slotY, occupied: false, item: null});
             }
         }
     }
 
-    addItem(item: Phaser.Physics.Arcade.Sprite) {
+    isPointInInventory(x: number, y: number): boolean {
+        const inventoryBounds = new Phaser.Geom.Rectangle(
+            this.player.sprite.x,
+            this.player.sprite.y,
+            this.gridSize * 5,
+            this.gridSize * 4
+        );
+        return inventoryBounds.contains(x, y);
+    }
+
+    addItemToFirstEmptySlot(item: Phaser.Physics.Arcade.Sprite) {
         const existingSlot = this.slots.find(slot => slot === item.getData('inventorySlot'));
         const emptySlot = existingSlot ? existingSlot : this.slots.find(slot => !slot.occupied);
         if (emptySlot) {
@@ -66,7 +82,9 @@ class InventoryManager {
             emptySlot.occupied = true;
             emptySlot.item = item;
             item.setData('inventorySlot', emptySlot);
+            return true;
         }
+        return false;
     }
 
     createSellArea() {
@@ -74,6 +92,78 @@ class InventoryManager {
         const sellAreaY = this.player.sprite.y;
         const sellArea = this.scene.add.rectangle(sellAreaX, sellAreaY, this.gridSize, this.gridSize, 0xff0000);
         sellArea.setInteractive().setData('sellArea', true);
+        sellArea.setName('sellArea');
+        this.inventoryContainer.add(sellArea);
+    }
+
+    open() {
+        this.isOpen = true;
+        this.inventoryContainer.setVisible(true);
+        this.showInventoryItems();
+    }
+
+    close() {
+        this.isOpen = false;
+        this.inventoryContainer.setVisible(false);
+        this.hideInventoryItems();
+    }
+
+    showInventoryItems() {
+        this.slots.forEach(slot => {
+            if (slot.item) {
+                slot.item.setVisible(true);
+            }
+        });
+    }
+
+    hideInventoryItems() {
+        this.slots.forEach(slot => {
+            if (slot.item) {
+                slot.item.setVisible(false);
+            }
+        });
+    }
+
+    removeItemFromSlot(item: Phaser.Physics.Arcade.Sprite) {
+        const slot = this.slots.find(s => s.item === item);
+        if (slot) {
+            slot.occupied = false;
+            slot.item = null;
+            item.setData('inventorySlot', null);
+        }
+    }
+
+    toggle() {
+        if (this.isOpen) {
+            this.close();
+        } else {
+            this.open();
+        }
+    }
+
+    updatePosition(playerX: number, playerY: number) {
+        this.inventoryContainer.setPosition(playerX, playerY);
+        this.slots.forEach((slot, index) => {
+            const x = (index % 5) * this.gridSize;
+            const y = Math.floor(index / 5) * this.gridSize;
+            slot.x = x;
+            slot.y = y;
+
+            const rectangle = this.inventoryContainer.getByName(`inventorySlot_${index}`) as Phaser.GameObjects.Rectangle;
+            if (rectangle) {
+                rectangle.setPosition(x, y);
+            }
+
+            if (slot.item) {
+                slot.item.setPosition(playerX + x, playerY + y);
+            }
+        });
+
+        // Update sell area position
+        const sellArea = this.inventoryContainer.getByName('sellArea') as Phaser.GameObjects.Rectangle;
+        if (sellArea) {
+            sellArea.setPosition((5 * this.gridSize) + 50, 0);
+        }
     }
 }
 
@@ -94,6 +184,8 @@ export class Game extends Scene {
     private groundLayer?: Phaser.Tilemaps.TilemapLayer;
     private waterLayer?: Phaser.Tilemaps.TilemapLayer;
     private treeLayer?: Phaser.Tilemaps.TilemapLayer;
+
+    private isDraggingItem: boolean = false;
 
     constructor() {
         super('Game');
@@ -197,6 +289,7 @@ export class Game extends Scene {
 
     onPlayerReady() {
         this.createChests();
+        this.createInventory();
         this.createItems();
         this.createInputListeners();
         this.createNetworkListeners();
@@ -216,7 +309,9 @@ export class Game extends Scene {
 
     createInputListeners() {
         this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
-            this.targetPosition = new Phaser.Math.Vector2(pointer.worldX, pointer.worldY);
+            if (!this.isDraggingItem) {
+                this.targetPosition = new Phaser.Math.Vector2(pointer.worldX, pointer.worldY);
+            }
         });
 
         this.input.on('gameobjectdown', (pointer: any, gameObject: any) => {
@@ -308,9 +403,21 @@ export class Game extends Scene {
         this.handlePlayerMovement(delta);
         this.player?.update();
         this.updateOtherPlayers();
+        this.updateInventoryPosition();
+    }
+
+    updateInventoryPosition() {
+        if (this.inventoryManager && this.player) {
+            this.inventoryManager.updatePosition(this.player.sprite.x, this.player.sprite.y);
+        }
     }
 
     handlePlayerMovement(delta: number) {
+        if (this.isDraggingItem) {
+            // If dragging an item, don't move the player
+            return;
+        }
+
         if (this.targetPosition) {
             const direction = this.targetPosition.clone().subtract(new Phaser.Math.Vector2(this.player.sprite.x, this.player.sprite.y));
             const distance = direction.length();
@@ -417,13 +524,24 @@ export class Game extends Scene {
 
             if (itemData.in_inventory === 1) {
                 itemAndText.text.text = '';
-                this.inventoryManager?.addItem(itemAndText.item);
+                this.inventoryManager?.addItemToFirstEmptySlot(itemAndText.item);
+                itemAndText.item.setVisible(this.inventoryManager?.isOpen || false);
+            } else {
+                itemAndText.item.setVisible(true);
             }
         });
     }
 
     setupItemDrag(item: Phaser.Physics.Arcade.Sprite) {
         this.input.setDraggable(item);
+
+        item.on('dragstart', () => {
+            this.isDraggingItem = true;
+            if (item.getData('inventorySlot')) {
+                this.inventoryManager?.removeItemFromSlot(item);
+            }
+        });
+
         item.on('drag', (pointer: any, dragX: any, dragY: any) => {
             item.x = dragX;
             item.y = dragY;
@@ -433,15 +551,30 @@ export class Game extends Scene {
                 text.y = dragY - 30;
             }
         });
-        item.on('dragend', (pointer: any, dragX: any, dragY: any) => {
-            const droppedOnInventorySlot = this.inventoryManager?.slots.some(slot =>
-                Phaser.Geom.Rectangle.Contains(
-                    new Phaser.Geom.Rectangle(slot.x - this.gridSize / 2, slot.y - this.gridSize / 2, this.gridSize, this.gridSize),
-                    item.x,
-                    item.y
-                )
-            );
-            this.updateItemPosition(item.getData('id'), item.x, item.y, droppedOnInventorySlot ? 1 : 0);
+
+        item.on('dragend', (pointer: any) => {
+            this.isDraggingItem = false;
+            const droppedOnInventory = this.inventoryManager?.isPointInInventory(item.x, item.y);
+
+            if (droppedOnInventory && this.inventoryManager?.isOpen) {
+                const addedToInventory = this.inventoryManager?.addItemToFirstEmptySlot(item);
+                if (addedToInventory) {
+                    this.updateItemPosition(item.getData('id'), item.x, item.y, 1);
+                    const text = this.itemMap.get(item.getData('id'))?.text;
+                    if (text) {
+                        text.setText('');
+                    }
+                } else {
+                    // If inventory is full, return item to the world
+                    this.updateItemPosition(item.getData('id'), item.x, item.y, 0);
+                    item.setVisible(true);
+                }
+            } else {
+                // If not dropped on inventory or inventory is closed, update its position in the world
+                this.updateItemPosition(item.getData('id'), item.x, item.y, 0);
+                item.setData('inventorySlot', null);
+                item.setVisible(true);
+            }
         });
     }
 
@@ -450,9 +583,15 @@ export class Game extends Scene {
             headers: {Authorization: `Bearer ${(window as any).authToken}`}
         }).catch(error => console.error('Error updating item position:', error));
 
-        const text = this.itemMap.get(itemId)?.text;
-        if (text) {
-            text.setPosition(x, y - 30);
+        const itemAndText = this.itemMap.get(itemId);
+        if (itemAndText) {
+            const {item, text} = itemAndText;
+            if (inInventory) {
+                text.setText('');
+            } else {
+                text.setText(`Item of\n${(window as any).email}`);
+                text.setPosition(x, y - 30);
+            }
         }
     }
 
