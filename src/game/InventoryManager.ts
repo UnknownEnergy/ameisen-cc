@@ -9,6 +9,7 @@ export class InventoryManager {
     isOpen: boolean = false;
     inventoryContainer: Phaser.GameObjects.Container;
     private moneyText: Phaser.GameObjects.Text;
+    private toggleButton: Phaser.GameObjects.Container;
 
     constructor(scene: Phaser.Scene, gridSize: number, player: Player) {
         this.scene = scene;
@@ -18,6 +19,7 @@ export class InventoryManager {
         this.createGrid(player.sprite.x, player.sprite.y);
         this.createSellArea();
         this.createMoneyDisplay();
+        this.createToggleButton();
         this.close(); // Start with the inventory closed
     }
 
@@ -29,6 +31,44 @@ export class InventoryManager {
 
     updateMoneyDisplay(amount: number) {
         this.moneyText.setText(`$${amount}`);
+    }
+
+    createToggleButton() {
+        const buttonWidth = 60;
+        const buttonHeight = 60;
+        const buttonRadius = 10;
+
+        // Create a rounded rectangle for the button background
+        const background = this.scene.add.graphics();
+        background.fillStyle(0x4a4a4a, 1);
+        background.fillRoundedRect(0, 0, buttonWidth, buttonHeight, buttonRadius);
+        background.lineStyle(2, 0xffffff, 1);
+        background.strokeRoundedRect(0, 0, buttonWidth, buttonHeight, buttonRadius);
+
+        // Create an icon for the button (you can replace this with an image if you prefer)
+        const icon = this.scene.add.text(buttonWidth / 2, buttonHeight / 2, '🎒', {
+            fontSize: '32px'
+        }).setOrigin(0.5);
+
+        // Create a container for the button
+        this.toggleButton = this.scene.add.container(0, 0, [background, icon]);
+        this.toggleButton.setSize(buttonWidth, buttonHeight);
+        this.toggleButton.setInteractive(new Phaser.Geom.Rectangle(30, 30, buttonWidth, buttonHeight), Phaser.Geom.Rectangle.Contains);
+
+        // Add touch event listener
+        // Add touch event listener
+        this.toggleButton.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+            this.toggle();
+        });
+
+        // Set the button's position relative to the player
+        this.updateToggleButtonPosition();
+
+        // Ensure the button is always on top and visible
+        this.toggleButton.setDepth(1000);
+        this.toggleButton.setScrollFactor(0);
+
+        this.toggle();
     }
 
     createGrid(startX: number, startY: number) {
@@ -136,6 +176,13 @@ export class InventoryManager {
         }
     }
 
+    updateToggleButtonPosition() {
+        const camera = this.scene.cameras.main;
+        const buttonX = camera.width - 80; // 20 pixels from the right edge
+        const buttonY = camera.height - 80; // 20 pixels from the bottom edge
+        this.toggleButton.setPosition(buttonX, buttonY);
+    }
+
     updatePosition(playerX: number, playerY: number) {
         this.inventoryContainer.setPosition(playerX, playerY);
         this.moneyText.setPosition(4 * this.gridSize, -70);
@@ -160,5 +207,6 @@ export class InventoryManager {
         if (sellArea) {
             sellArea.setPosition((5 * this.gridSize) + 50, 0);
         }
+        this.updateToggleButtonPosition();
     }
 }

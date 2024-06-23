@@ -6,7 +6,7 @@ export class PlayerCommands {
     speechBubble: any;
     commands: any;
 
-    constructor(player: any, speechBubble: SpeechBubble, inventoryManager: InventoryManager) {
+    constructor(player: any, speechBubble: SpeechBubble) {
         this.speechBubble = speechBubble;
         // Maintain a list of commands and their descriptions
         this.commands = {
@@ -60,10 +60,6 @@ export class PlayerCommands {
             "p": {
                 description: "Displays the player's current position.",
                 action: () => speechBubble.setText(`x: ${player.x} y: ${player.y}`)
-            },
-            "i": {
-                description: "Displays the player's inventory.",
-                action: () => inventoryManager.toggle()
             }
         };
     }

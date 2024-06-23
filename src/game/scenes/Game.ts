@@ -1,6 +1,5 @@
 import {EventBus} from '../EventBus';
 import {Scene} from 'phaser';
-import {SpeechBubble} from '../SpeechBubble';
 import {PlayerCommands} from "../PlayerCommands";
 import axios from "axios";
 import {environment} from '../../environments/environment';
@@ -182,7 +181,7 @@ export class Game extends Scene {
     private handleKeyDown(event: KeyboardEvent) {
         if (event.key === 'Enter') {
             this.player.speechBubble.setText(this.typedText, 0xffffff);
-            new PlayerCommands(this.player.sprite, this.player.speechBubble, this.inventoryManager).executeCommand(this.typedText);
+            new PlayerCommands(this.player.sprite, this.player.speechBubble).executeCommand(this.typedText);
             this.typedText = '';
         } else if (event.key === 'Backspace') {
             this.typedText = this.typedText.slice(0, -1);
@@ -292,7 +291,14 @@ export class Game extends Scene {
             });
             const players = response.data;
 
-            players.forEach((playerData: { player_id: string; x: number; y: number; skin: string; chat: string; money: number }) => {
+            players.forEach((playerData: {
+                player_id: string;
+                x: number;
+                y: number;
+                skin: string;
+                chat: string;
+                money: number
+            }) => {
                 if (playerData.player_id === (window as any).email) {
                     // Update the current player's money
                     this.updatePlayerMoney(playerData.money);
@@ -324,7 +330,7 @@ export class Game extends Scene {
     async sellItem(itemId: string) {
         try {
             const response = await axios.post(`${this.SERVER_URI}/sell/${itemId}`, {}, {
-                headers: { Authorization: `Bearer ${(window as any).authToken}` }
+                headers: {Authorization: `Bearer ${(window as any).authToken}`}
             });
 
             // Remove the item from the game
@@ -440,8 +446,7 @@ export class Game extends Scene {
 
             if (droppedOnSellArea && this.inventoryManager?.isOpen) {
                 this.sellItem(item.getData('id'));
-            }
-            else if (droppedOnInventory && this.inventoryManager?.isOpen) {
+            } else if (droppedOnInventory && this.inventoryManager?.isOpen) {
                 const addedToInventory = this.inventoryManager?.addItemToFirstEmptySlot(item);
                 if (addedToInventory) {
                     this.updateItemPosition(item.getData('id'), item.x, item.y, 1);
@@ -514,7 +519,7 @@ export class Game extends Scene {
         this.inputField.addEventListener('keydown', (event) => {
             if (event.key === 'Enter') {
                 this.player.speechBubble.setText(this.typedText, 0xffffff);
-                new PlayerCommands(this.player.sprite, this.player.speechBubble, this.inventoryManager).executeCommand(this.typedText);
+                new PlayerCommands(this.player.sprite, this.player.speechBubble).executeCommand(this.typedText);
                 this.inputField.value = '';
                 this.hideInputField();
             } else if (event.key === 'Backspace') {
