@@ -375,9 +375,18 @@ export class Game extends Scene {
     }
 
     renderItems(items: any[]) {
+
         items.forEach(itemData => {
             if (itemData.in_inventory === 1 && (itemData.player_id !== (window as any).email)) {
-                return; //skip rendering inventory items of other players
+                const itemToRemove = this.itemMap.get(itemData.id);
+                if (itemToRemove) {
+                    itemToRemove.item.destroy();
+                    if (itemToRemove.text) {
+                        itemToRemove.text.destroy();
+                    }
+                    this.itemMap.delete(itemData.id);
+                }
+                return;
             }
 
             let itemAndText = this.itemMap.get(itemData.id);
