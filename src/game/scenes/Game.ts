@@ -270,7 +270,6 @@ export class Game extends Scene {
     initializePlayer() {
         this.fetchInitialPlayerData().then(({x, y, skin}) => {
             this.player = new Player(this, x, y, 'player', skin);
-            this.player.nameText.setText((window as any).email);
 
             // Add colliders
             if (this.waterLayer) {
@@ -292,7 +291,6 @@ export class Game extends Scene {
             console.error('Error creating player:', error);
             // Create a player with default values
             this.player = new Player(this, this.gridSize * 150, this.gridSize * 140, 'player', '0');
-            this.player.nameText.setText((window as any).email);
             this.setupCamera();
             this.onPlayerReady();
         });
@@ -360,7 +358,6 @@ export class Game extends Scene {
         if (event.key === 'Enter') {
             this.player.speechBubble.setText(this.typedText, 0xffffff);
             new PlayerCommands(this.player.sprite, this.player.speechBubble, this).executeCommand(this.typedText);
-            this.player.speechBubble.startTypingTimer();
             this.typedText = '';
         } else if (event.key === 'Backspace') {
             this.typedText = this.typedText.slice(0, -1);
@@ -518,12 +515,10 @@ export class Game extends Scene {
 
             // Optionally, show a message to the player
             this.player.speechBubble.setText(`Sold item for $${response.data.money}`, 0x00ff00);
-            this.player.speechBubble.startTypingTimer();
         } catch (error) {
             console.error('Error selling item:', error);
             // Optionally, show an error message to the player
             this.player.speechBubble.setText('Error selling item', 0xff0000);
-            this.player.speechBubble.startTypingTimer();
         }
     }
 
@@ -682,6 +677,7 @@ export class Game extends Scene {
         this.inputField.style.top = '-100px';
         this.inputField.style.left = '-100px';
         this.inputField.style.opacity = '0';
+        this.inputField.disabled = true;  // Start as disabled
         document.body.appendChild(this.inputField);
 
         this.inputField.addEventListener('input', () => {
@@ -694,7 +690,6 @@ export class Game extends Scene {
             if (event.key === 'Enter') {
                 this.player.speechBubble.setText(this.typedText, 0xffffff);
                 new PlayerCommands(this.player.sprite, this.player.speechBubble, this).executeCommand(this.typedText);
-                this.player.speechBubble.startTypingTimer();
                 this.inputField.value = '';
                 this.hideInputField();
             } else if (event.key === 'Backspace') {
@@ -714,11 +709,15 @@ export class Game extends Scene {
         this.inputField.style.top = `${y}px`;
         this.inputField.style.left = `${x}px`;
         this.inputField.style.opacity = '1';
+        this.inputField.disabled = false;
         this.inputField.focus();
     }
 
     hideInputField() {
+        this.inputField.style.top = '-100px';
+        this.inputField.style.left = '-100px';
         this.inputField.style.opacity = '0';
+        this.inputField.disabled = true;
         this.inputField.blur();
     }
 }

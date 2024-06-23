@@ -45,14 +45,4 @@ export class SpeechBubble extends Phaser.GameObjects.Container {
         this.setVisible(false);
         this.setText("");
     }
-
-    startTypingTimer() {
-        this.scene.time.addEvent({
-            delay: 8000,
-            callback: () => {
-                this.hide();
-            },
-            loop: false
-        });
-    }
 }
