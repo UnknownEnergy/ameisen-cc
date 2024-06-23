@@ -18,6 +18,7 @@ export class InventoryManager {
     private availableSkins: string[] = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '15'];
     private currentSkinIndex: number = 0;
     private skinPrices: Map<string, number> = new Map();
+    private skinShopToggleButton: Phaser.GameObjects.Container;
 
 
     constructor(scene: Phaser.Scene, gridSize: number, player: Player) {
@@ -31,6 +32,7 @@ export class InventoryManager {
         this.fetchSkinPrices();
         this.createSkinShop();
         this.createToggleButton();
+        this.createSkinShopToggleButton();
         this.close(); // Start with the inventory closed
     }
 
@@ -72,8 +74,6 @@ export class InventoryManager {
             this.toggle();
         });
 
-        // Set the button's position relative to the player
-        this.updateToggleButtonPosition();
 
         // Ensure the button is always on top and visible
         this.toggleButton.setDepth(1000);
@@ -81,6 +81,41 @@ export class InventoryManager {
 
         this.toggle();
     }
+
+    createSkinShopToggleButton() {
+        const buttonWidth = 60;
+        const buttonHeight = 60;
+        const buttonRadius = 10;
+
+        // Create a rounded rectangle for the button background
+        const background = this.scene.add.graphics();
+        background.fillStyle(0x4a4a4a, 1);
+        background.fillRoundedRect(0, 0, buttonWidth, buttonHeight, buttonRadius);
+        background.lineStyle(2, 0xffffff, 1);
+        background.strokeRoundedRect(0, 0, buttonWidth, buttonHeight, buttonRadius);
+
+        // Create an icon for the button
+        const icon = this.scene.add.text(buttonWidth / 2, buttonHeight / 2, '👕', {
+            fontSize: '32px'
+        }).setOrigin(0.5);
+
+        // Create a container for the button
+        this.skinShopToggleButton = this.scene.add.container(0, 0, [background, icon]);
+        this.skinShopToggleButton.setSize(buttonWidth, buttonHeight);
+        this.skinShopToggleButton.setInteractive(new Phaser.Geom.Rectangle(30, 30, buttonWidth, buttonHeight), Phaser.Geom.Rectangle.Contains);
+
+        // Add touch event listener
+        this.skinShopToggleButton.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+            this.toggleSkinShop();
+        });
+
+        // Ensure the button is always on top and visible
+        this.skinShopToggleButton.setDepth(1000);
+        this.skinShopToggleButton.setScrollFactor(0);
+
+        this.updateButtonPositions();
+    }
+
 
     createGrid(startX: number, startY: number) {
         for (let y = 0; y < 4; y++) {
@@ -185,19 +220,36 @@ export class InventoryManager {
             this.close();
         } else {
             this.open();
+            this.skinShopContainer.setVisible(false);
         }
     }
 
-    updateToggleButtonPosition() {
-        const camera = this.scene.cameras.main;
-        const buttonX = camera.width - 80;
-        const buttonY = camera.height - 80;
-        this.toggleButton.setPosition(buttonX, buttonY);
+    toggleSkinShop() {
+        if (this.skinShopContainer.visible) {
+            this.skinShopContainer.setVisible(false);
+        } else {
+            this.skinShopContainer.setVisible(true);
+            this.close();
+        }
     }
+
+
+    updateButtonPositions() {
+        const camera = this.scene.cameras.main;
+        const inventoryButtonX = camera.width - 80;
+        const inventoryButtonY = camera.height - 80;
+        this.toggleButton.setPosition(inventoryButtonX, inventoryButtonY);
+
+        const skinShopButtonX = camera.width - 80;
+        const skinShopButtonY = camera.height - 150;
+        this.skinShopToggleButton.setPosition(skinShopButtonX, skinShopButtonY);
+    }
+
 
     updatePosition(playerX: number, playerY: number) {
         const camera = this.scene.cameras.main;
         this.inventoryContainer.setPosition(playerX - camera.width / 3, playerY + 80);
+        this.skinShopContainer.setPosition(playerX - camera.width / 3, playerY + 80);
         this.moneyText.setPosition(4 * this.gridSize, -70);
         this.slots.forEach((slot, index) => {
             const x = (index % 5) * this.gridSize;
@@ -220,12 +272,11 @@ export class InventoryManager {
         if (sellArea) {
             sellArea.setPosition((5 * this.gridSize), 0);
         }
-        this.updateToggleButtonPosition();
+        this.updateButtonPositions();
     }
 
     createSkinShop() {
         this.skinShopContainer = this.scene.add.container(0, 0);
-        this.inventoryContainer.add(this.skinShopContainer);
 
         const background = this.scene.add.rectangle(0, 0, this.gridSize * 3, this.gridSize * 4, 0x333333);
         background.setOrigin(0);
@@ -249,8 +300,6 @@ export class InventoryManager {
             .setInteractive()
             .on('pointerdown', () => this.buySkin());
         this.skinShopContainer.add(this.buyButton);
-
-        this.skinShopContainer.setPosition(this.gridSize * 6, 0);
     }
 
     nextSkin() {
