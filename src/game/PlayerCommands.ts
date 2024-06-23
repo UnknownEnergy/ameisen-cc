@@ -50,13 +50,6 @@ export class PlayerCommands {
                 description: "Teleports the player to Wald.",
                 action: () => player.setPosition(9827, 1459)
             },
-            "skin": {
-                description: "Changes skin to chosen number.",
-                action: (args: string[]) => {
-                    const skinNumber = args[0];
-                    player.setFrame(skinNumber);
-                }
-            },
             "p": {
                 description: "Displays the player's current position.",
                 action: () => speechBubble.setText(`x: ${player.x} y: ${player.y}`)

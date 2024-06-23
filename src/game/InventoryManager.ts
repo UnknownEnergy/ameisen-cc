@@ -1,5 +1,7 @@
 import {Scene} from "phaser";
 import {Player} from "./Player";
+import axios from "axios";
+import {environment} from "../environments/environment";
 
 export class InventoryManager {
     private scene: Scene;
@@ -10,6 +12,13 @@ export class InventoryManager {
     inventoryContainer: Phaser.GameObjects.Container;
     private moneyText: Phaser.GameObjects.Text;
     private toggleButton: Phaser.GameObjects.Container;
+    private skinShopContainer: Phaser.GameObjects.Container;
+    private skinPreview: Phaser.GameObjects.Sprite;
+    private buyButton: Phaser.GameObjects.Text;
+    private availableSkins: string[] = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '15'];
+    private currentSkinIndex: number = 0;
+    private skinPrices: Map<string, number> = new Map();
+
 
     constructor(scene: Phaser.Scene, gridSize: number, player: Player) {
         this.scene = scene;
@@ -19,6 +28,8 @@ export class InventoryManager {
         this.createGrid(player.sprite.x, player.sprite.y);
         this.createSellArea();
         this.createMoneyDisplay();
+        this.fetchSkinPrices();
+        this.createSkinShop();
         this.createToggleButton();
         this.close(); // Start with the inventory closed
     }
@@ -210,5 +221,95 @@ export class InventoryManager {
             sellArea.setPosition((5 * this.gridSize), 0);
         }
         this.updateToggleButtonPosition();
+    }
+
+    createSkinShop() {
+        this.skinShopContainer = this.scene.add.container(0, 0);
+        this.inventoryContainer.add(this.skinShopContainer);
+
+        const background = this.scene.add.rectangle(0, 0, this.gridSize * 3, this.gridSize * 4, 0x333333);
+        background.setOrigin(0);
+        this.skinShopContainer.add(background);
+
+        this.skinPreview = this.scene.add.sprite(this.gridSize * 1.5, this.gridSize, 'player', this.availableSkins[0]);
+        this.skinShopContainer.add(this.skinPreview);
+
+        const nextButton = this.scene.add.text(this.gridSize * 2.5, this.gridSize, '>', { fontSize: '32px' })
+            .setInteractive()
+            .on('pointerdown', () => this.nextSkin());
+        this.skinShopContainer.add(nextButton);
+
+        const prevButton = this.scene.add.text(this.gridSize * 0.5, this.gridSize, '<', { fontSize: '32px' })
+            .setInteractive()
+            .on('pointerdown', () => this.prevSkin());
+        this.skinShopContainer.add(prevButton);
+
+        this.buyButton = this.scene.add.text(this.gridSize * 1.5, this.gridSize * 3, `Buy now`, { fontSize: '24px' })
+            .setOrigin(0.5)
+            .setInteractive()
+            .on('pointerdown', () => this.buySkin());
+        this.skinShopContainer.add(this.buyButton);
+
+        this.skinShopContainer.setPosition(this.gridSize * 6, 0);
+    }
+
+    nextSkin() {
+        this.currentSkinIndex = (this.currentSkinIndex + 1) % this.availableSkins.length;
+        this.updateSkinPreview();
+        this.updateSkinShopDisplay();
+    }
+
+    prevSkin() {
+        this.currentSkinIndex = (this.currentSkinIndex - 1 + this.availableSkins.length) % this.availableSkins.length;
+        this.updateSkinPreview();
+        this.updateSkinShopDisplay();
+    }
+
+    updateSkinPreview() {
+        this.skinPreview.setFrame(this.availableSkins[this.currentSkinIndex]);
+    }
+
+    buySkin() {
+        const selectedSkin = this.availableSkins[this.currentSkinIndex];
+        // Call the server endpoint to buy the skin
+        axios.post(`${environment.apiUrl}/buy-skin`, { skinId: selectedSkin }, {
+            headers: { Authorization: `Bearer ${(window as any).authToken}` }
+        })
+            .then(response => {
+                if (response.data.success) {
+                    // Update player's skin and money
+                    this.player.sprite.setFrame(selectedSkin);
+                    this.updateMoneyDisplay(response.data.newBalance);
+                    this.scene.events.emit('skinPurchased', selectedSkin);
+                } else {
+                    console.error('Failed to buy skin:', response.data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Error buying skin:', error);
+            });
+    }
+
+    async fetchSkinPrices() {
+        try {
+            const response = await axios.get(`${environment.apiUrl}/skin-prices`, {
+                headers: { Authorization: `Bearer ${(window as any).authToken}` }
+            });
+            response.data.forEach((item: { skin_id: string, price: number }) => {
+                this.skinPrices.set(item.skin_id, item.price);
+            });
+            this.updateSkinShopDisplay();
+        } catch (error) {
+            console.error('Error fetching skin prices:', error);
+        }
+    }
+
+    updateSkinShopDisplay() {
+        const currentSkin = this.availableSkins[this.currentSkinIndex];
+        const price = this.skinPrices.get(currentSkin) || 0;
+        this.buyButton.setText(`Buy for $${price}`);
+
+        // Update the preview
+        this.skinPreview.setFrame(currentSkin);
     }
 }
