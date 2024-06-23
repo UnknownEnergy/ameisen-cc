@@ -147,7 +147,7 @@ export class Game extends Scene {
 
     createInputListeners() {
         this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
-            if (!this.isDraggingItem) {
+            if (!this.isDraggingItem || this.inventoryManager?.isOpen) {
                 this.targetPosition = new Phaser.Math.Vector2(pointer.worldX, pointer.worldY);
             }
         });
@@ -250,7 +250,7 @@ export class Game extends Scene {
     }
 
     handlePlayerMovement(delta: number) {
-        if (this.isDraggingItem) {
+        if (this.isDraggingItem || this.inventoryManager?.isOpen) {
             // If dragging an item, don't move the player
             return;
         }
