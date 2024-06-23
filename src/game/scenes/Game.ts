@@ -35,6 +35,7 @@ class InventoryManager {
     private player: Player;
     isOpen: boolean = false;
     private inventoryContainer: Phaser.GameObjects.Container;
+    private moneyText: Phaser.GameObjects.Text;
 
     constructor(scene: Phaser.Scene, gridSize: number, player: Player) {
         this.scene = scene;
@@ -43,7 +44,18 @@ class InventoryManager {
         this.inventoryContainer = this.scene.add.container(0, 0);
         this.createGrid(player.sprite.x, player.sprite.y);
         this.createSellArea();
+        this.createMoneyDisplay();
         this.close(); // Start with the inventory closed
+    }
+
+    createMoneyDisplay() {
+        this.moneyText = this.scene.add.text(0, 0, '$0', { fontSize: '24px', color: '#ffffff' });
+        this.moneyText.setOrigin(1, 0);
+        this.inventoryContainer.add(this.moneyText);
+    }
+
+    updateMoneyDisplay(amount: number) {
+        this.moneyText.setText(`$${amount}`);
     }
 
     createGrid(startX: number, startY: number) {
@@ -73,6 +85,14 @@ class InventoryManager {
         return inventoryBounds.contains(x, y);
     }
 
+    isSellArea(x: number, y: number): boolean {
+        const sellArea = this.inventoryContainer.getByName('sellArea') as Phaser.GameObjects.Rectangle;
+        if (sellArea) {
+            return sellArea.getBounds().contains(x, y);
+        }
+        return false;
+    }
+
     addItemToFirstEmptySlot(item: Phaser.Physics.Arcade.Sprite) {
         const existingSlot = this.slots.find(slot => slot === item.getData('inventorySlot'));
         const emptySlot = existingSlot ? existingSlot : this.slots.find(slot => !slot.occupied);
@@ -100,12 +120,14 @@ class InventoryManager {
         this.isOpen = true;
         this.inventoryContainer.setVisible(true);
         this.showInventoryItems();
+        this.moneyText.setVisible(true);
     }
 
     close() {
         this.isOpen = false;
         this.inventoryContainer.setVisible(false);
         this.hideInventoryItems();
+        this.moneyText.setVisible(false);
     }
 
     showInventoryItems() {
@@ -143,6 +165,7 @@ class InventoryManager {
 
     updatePosition(playerX: number, playerY: number) {
         this.inventoryContainer.setPosition(playerX, playerY);
+        this.moneyText.setPosition(4 * this.gridSize, -70);
         this.slots.forEach((slot, index) => {
             const x = (index % 5) * this.gridSize;
             const y = Math.floor(index / 5) * this.gridSize;
@@ -186,6 +209,7 @@ export class Game extends Scene {
     private treeLayer?: Phaser.Tilemaps.TilemapLayer;
 
     private isDraggingItem: boolean = false;
+    private playerMoney: number = 0;
 
     constructor() {
         super('Game');
@@ -446,8 +470,12 @@ export class Game extends Scene {
             });
             const players = response.data;
 
-            players.forEach((playerData: { player_id: string; x: number; y: number; skin: string; chat: string }) => {
-                if (playerData.player_id !== (window as any).email) {
+            players.forEach((playerData: { player_id: string; x: number; y: number; skin: string; chat: string; money: number }) => {
+                if (playerData.player_id === (window as any).email) {
+                    // Update the current player's money
+                    this.updatePlayerMoney(playerData.money);
+                } else {
+                    // Handle other players as before
                     let otherPlayer = this.otherPlayers[playerData.player_id];
                     if (!otherPlayer) {
                         otherPlayer = new Player(this, playerData.x, playerData.y, 'player', playerData.skin);
@@ -463,6 +491,39 @@ export class Game extends Scene {
             });
         } catch (error) {
             console.error('Error fetching players data:', error);
+        }
+    }
+
+    updatePlayerMoney(newBalance: number) {
+        this.playerMoney = newBalance;
+        this.inventoryManager?.updateMoneyDisplay(this.playerMoney);
+    }
+
+    async sellItem(itemId: string) {
+        try {
+            const response = await axios.post(`${this.SERVER_URI}/sell/${itemId}`, {}, {
+                headers: { Authorization: `Bearer ${(window as any).authToken}` }
+            });
+
+            // Remove the item from the game
+            const itemAndText = this.itemMap.get(itemId);
+            if (itemAndText) {
+                itemAndText.item.destroy();
+                itemAndText.text.destroy();
+                this.itemMap.delete(itemId);
+            }
+
+            // Fetch updated player data (including new money balance)
+            await this.fetchAndRenderPlayers();
+
+            // Optionally, show a message to the player
+            this.player.speechBubble.setText(`Sold item for $${response.data.money}`, 0x00ff00);
+            this.player.speechBubble.startTypingTimer();
+        } catch (error) {
+            console.error('Error selling item:', error);
+            // Optionally, show an error message to the player
+            this.player.speechBubble.setText('Error selling item', 0xff0000);
+            this.player.speechBubble.startTypingTimer();
         }
     }
 
@@ -555,8 +616,12 @@ export class Game extends Scene {
         item.on('dragend', (pointer: any) => {
             this.isDraggingItem = false;
             const droppedOnInventory = this.inventoryManager?.isPointInInventory(item.x, item.y);
+            const droppedOnSellArea = this.inventoryManager?.isSellArea(item.x, item.y);
 
-            if (droppedOnInventory && this.inventoryManager?.isOpen) {
+            if (droppedOnSellArea && this.inventoryManager?.isOpen) {
+                this.sellItem(item.getData('id'));
+            }
+            else if (droppedOnInventory && this.inventoryManager?.isOpen) {
                 const addedToInventory = this.inventoryManager?.addItemToFirstEmptySlot(item);
                 if (addedToInventory) {
                     this.updateItemPosition(item.getData('id'), item.x, item.y, 1);
