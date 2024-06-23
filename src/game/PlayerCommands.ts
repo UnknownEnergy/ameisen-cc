@@ -1,11 +1,12 @@
-import {Scene} from "phaser";
+import {InventoryManager} from "./InventoryManager";
+import {SpeechBubble} from "./SpeechBubble";
 
 export class PlayerCommands {
 
     speechBubble: any;
     commands: any;
 
-    constructor(player: any, speechBubble: any, scene: any) {
+    constructor(player: any, speechBubble: SpeechBubble, inventoryManager: InventoryManager) {
         this.speechBubble = speechBubble;
         // Maintain a list of commands and their descriptions
         this.commands = {
@@ -62,7 +63,7 @@ export class PlayerCommands {
             },
             "i": {
                 description: "Displays the player's inventory.",
-                action: () => scene.inventoryManager.toggle()
+                action: () => inventoryManager.toggle()
             }
         };
     }
