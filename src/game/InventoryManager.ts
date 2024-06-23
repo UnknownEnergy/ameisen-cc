@@ -89,9 +89,10 @@ export class InventoryManager {
     }
 
     isPointInInventory(x: number, y: number): boolean {
+        const camera = this.scene.cameras.main;
         const inventoryBounds = new Phaser.Geom.Rectangle(
-            this.player.sprite.x,
-            this.player.sprite.y,
+            this.player.sprite.x - camera.width / 3,
+            this.player.sprite.y + 80,
             this.gridSize * 5,
             this.gridSize * 4
         );
@@ -178,13 +179,14 @@ export class InventoryManager {
 
     updateToggleButtonPosition() {
         const camera = this.scene.cameras.main;
-        const buttonX = camera.width - 80; // 20 pixels from the right edge
-        const buttonY = camera.height - 80; // 20 pixels from the bottom edge
+        const buttonX = camera.width - 80;
+        const buttonY = camera.height - 80;
         this.toggleButton.setPosition(buttonX, buttonY);
     }
 
     updatePosition(playerX: number, playerY: number) {
-        this.inventoryContainer.setPosition(playerX, playerY);
+        const camera = this.scene.cameras.main;
+        this.inventoryContainer.setPosition(playerX - camera.width / 3, playerY + 80);
         this.moneyText.setPosition(4 * this.gridSize, -70);
         this.slots.forEach((slot, index) => {
             const x = (index % 5) * this.gridSize;
@@ -198,14 +200,14 @@ export class InventoryManager {
             }
 
             if (slot.item) {
-                slot.item.setPosition(playerX + x, playerY + y);
+                slot.item.setPosition(playerX - camera.width / 3 + x, playerY + 80 + y);
             }
         });
 
         // Update sell area position
         const sellArea = this.inventoryContainer.getByName('sellArea') as Phaser.GameObjects.Rectangle;
         if (sellArea) {
-            sellArea.setPosition((5 * this.gridSize) + 50, 0);
+            sellArea.setPosition((5 * this.gridSize), 0);
         }
         this.updateToggleButtonPosition();
     }

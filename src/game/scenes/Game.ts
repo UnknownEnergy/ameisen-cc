@@ -131,14 +131,6 @@ export class Game extends Scene {
         this.createItems();
         this.createInputListeners();
         this.createNetworkListeners();
-        // Set the rendering order of game objects
-        this.inventoryManager.inventoryContainer.setDepth(4);
-        this.player.sprite.setDepth(3);
-        Object.values(this.otherPlayers).forEach((player) => {
-            player.sprite.setDepth(2);
-        });
-        this.items.setDepth(1);
-        this.chests.setDepth(0);
     }
 
     createChests() {
