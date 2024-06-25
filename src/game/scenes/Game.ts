@@ -27,14 +27,28 @@ export class Game extends Scene {
     private isDraggingItem: boolean = false;
     private playerMoney: number = 0;
 
+    private placingHouse: Phaser.GameObjects.Sprite | null = null;
+    private houses: Phaser.Physics.Arcade.StaticGroup;
+
     constructor() {
         super('Game');
     }
 
     async create() {
         this.createMap();
-        this.initializePlayer()
+        this.houses = this.physics.add.staticGroup();
+        this.events.on('housePurchased', (houseFrame: string, price: number) => {
+            this.placeHouse(houseFrame);
+        });
+
+        this.initializePlayer();
+        this.scale.on('resize', this.handleResize, this);
         EventBus.emit('current-scene-ready', this);
+    }
+
+    handleResize(gameSize: Phaser.Structs.Size) {
+        this.cameras.resize(gameSize.width, gameSize.height);
+        this.inventoryManager.updateButtonPositions();
     }
 
     createMap() {
@@ -142,7 +156,9 @@ export class Game extends Scene {
     }
 
     createInventory() {
-        this.inventoryManager = new InventoryManager(this, this.gridSize, this.player);
+        this.inventoryManager = new InventoryManager(this, this.player);
+        this.inventoryManager.updateButtonPositions();
+        this.inventoryManager.updateInventoryPosition();
     }
 
     createInputListeners() {
@@ -189,8 +205,18 @@ export class Game extends Scene {
     private longPressDuration: number = 500;
 
     private onPointerDown(pointer: Phaser.Input.Pointer) {
+        // Check if the click is on a UI element
+        if (this.inventoryManager.isPointInInventory(pointer.x, pointer.y) ||
+            this.inventoryManager.isSellArea(pointer.x, pointer.y)) {
+            // Handle inventory interaction
+            return;
+        }
+
+        // Handle world interaction
         if (this.player.sprite.getBounds().contains(pointer.worldX, pointer.worldY)) {
             this.pointerDownTime = this.time.now;
+        } else {
+            this.targetPosition = new Phaser.Math.Vector2(pointer.worldX, pointer.worldY);
         }
     }
 
@@ -230,6 +256,7 @@ export class Game extends Scene {
             callback: () => {
                 this.fetchChestsData();
                 this.fetchItemsData();
+                this.fetchAndRenderHouses();
             },
             callbackScope: this,
             loop: true
@@ -240,17 +267,10 @@ export class Game extends Scene {
         this.handlePlayerMovement(delta);
         this.player?.update();
         this.updateOtherPlayers();
-        this.updateInventoryPosition();
-    }
-
-    updateInventoryPosition() {
-        if (this.inventoryManager && this.player) {
-            this.inventoryManager.updatePosition(this.player.sprite.x, this.player.sprite.y);
-        }
     }
 
     handlePlayerMovement(delta: number) {
-        if (this.isDraggingItem || this.inventoryManager?.isOpen) {
+        if (this.isDraggingItem) {
             // If dragging an item, don't move the player
             return;
         }
@@ -412,7 +432,7 @@ export class Game extends Scene {
 
             if (itemData.in_inventory === 1) {
                 itemAndText.text.text = '';
-                this.inventoryManager?.addItemToFirstEmptySlot(itemAndText.item);
+                this.inventoryManager?.addItem(itemAndText.item);
                 itemAndText.item.setVisible(this.inventoryManager?.isOpen || false);
             } else {
                 itemAndText.item.setVisible(true);
@@ -426,7 +446,7 @@ export class Game extends Scene {
         item.on('dragstart', () => {
             this.isDraggingItem = true;
             if (item.getData('inventorySlot')) {
-                this.inventoryManager?.removeItemFromSlot(item);
+                this.inventoryManager?.removeItem(item);
             }
         });
 
@@ -448,7 +468,7 @@ export class Game extends Scene {
             if (droppedOnSellArea && this.inventoryManager?.isOpen) {
                 this.sellItem(item.getData('id'));
             } else if (droppedOnInventory && this.inventoryManager?.isOpen) {
-                const addedToInventory = this.inventoryManager?.addItemToFirstEmptySlot(item);
+                const addedToInventory = this.inventoryManager?.addItem(item);
                 if (addedToInventory) {
                     this.updateItemPosition(item.getData('id'), item.x, item.y, 1);
                     const text = this.itemMap.get(item.getData('id'))?.text;
@@ -551,4 +571,72 @@ export class Game extends Scene {
         this.inputField.disabled = true;
         this.inputField.blur();
     }
+
+    placeHouse(houseFrame: string) {
+        if (this.placingHouse) {
+            this.placingHouse.destroy();
+        }
+        this.placingHouse = this.add.sprite(this.input.activePointer.worldX, this.input.activePointer.worldY, 'houses', houseFrame);
+        this.placingHouse.setAlpha(0.7);
+
+        this.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
+            if (this.placingHouse) {
+                this.placingHouse.x = pointer.worldX;
+                this.placingHouse.y = pointer.worldY;
+            }
+        });
+
+        this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+            if (this.placingHouse) {
+                // Check if the placement is valid (not colliding with other objects)
+                if (this.isValidPlacement(this.placingHouse.x, this.placingHouse.y)) {
+                    this.confirmHousePlacement(houseFrame, this.placingHouse.x, this.placingHouse.y);
+                } else {
+                    console.log("Invalid placement");
+                }
+            }
+        });
+    }
+
+    isValidPlacement(x: number, y: number): boolean {
+        // Implement collision checking logic here
+        // Return true if the placement is valid, false otherwise
+        return true;
+    }
+
+    confirmHousePlacement(houseFrame: string, x: number, y: number) {
+        axios.post(`${environment.apiUrl}/place-house`, { houseId: houseFrame, x, y }, {
+            headers: { Authorization: `Bearer ${(window as any).authToken}` }
+        })
+            .then(response => {
+                if (response.data.success) {
+                    const house = this.houses.create(x, y, 'houses', houseFrame);
+                    house.setData('id', response.data.houseId);
+                    // @ts-ignore
+                    this.placingHouse.destroy();
+                    this.placingHouse = null;
+                } else {
+                    console.error('Failed to place house:', response.data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Error placing house:', error);
+            });
+    }
+
+    async fetchAndRenderHouses() {
+        try {
+            const response = await axios.get(`${environment.apiUrl}/houses`, {
+                headers: { Authorization: `Bearer ${(window as any).authToken}` }
+            });
+            response.data.forEach((houseData: { id: string, x: number, y: number, frame: string }) => {
+                const house = this.houses.create(houseData.x, houseData.y, 'houses', houseData.frame);
+                house.setData('id', houseData.id);
+            });
+        } catch (error) {
+            console.error('Error fetching houses:', error);
+        }
+    }
+
 }
+

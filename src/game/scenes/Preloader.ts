@@ -28,6 +28,10 @@ export class Preloader extends Scene
             frameWidth: 32,
             frameHeight: 32
         });
+        this.load.spritesheet('houses', 'spritesheets/housesspritesheet.png', {
+            frameWidth: 128,
+            frameHeight: 128
+        });
     }
 
     create ()

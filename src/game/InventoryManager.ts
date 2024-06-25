@@ -1,282 +1,228 @@
-import {Scene} from "phaser";
-import {Player} from "./Player";
+import { Scene } from "phaser";
+import { Player } from "./Player";
 import axios from "axios";
-import {environment} from "../environments/environment";
+import { environment } from "../environments/environment";
 
 export class InventoryManager {
     private scene: Scene;
-    private readonly gridSize: number;
-    slots: { x: number; y: number; occupied: boolean; item: any }[] = [];
     private player: Player;
+    private gridSize: number = 64;
+    private slots: InventorySlot[] = [];
     isOpen: boolean = false;
-    inventoryContainer: Phaser.GameObjects.Container;
+
+    private mainContainer: Phaser.GameObjects.Container;
+    private inventoryContainer: Phaser.GameObjects.Container;
+    private skinShopContainer: Phaser.GameObjects.Container;
+    private houseShopContainer: Phaser.GameObjects.Container;
+
     private moneyText: Phaser.GameObjects.Text;
     private toggleButton: Phaser.GameObjects.Container;
-    private skinShopContainer: Phaser.GameObjects.Container;
+    private skinShopToggleButton: Phaser.GameObjects.Container;
+    private houseShopToggleButton: Phaser.GameObjects.Container;
+
+    private sellArea: Phaser.GameObjects.Rectangle;
+
+    private currentSkinIndex: number = 0;
+    private currentHouseIndex: number = 0;
+    private skinPrices: Map<string, number> = new Map();
+    private housePrices: Map<string, number> = new Map();
+
+    private housePreview: Phaser.GameObjects.Sprite;
+    private buyHouseButton: Phaser.GameObjects.Text;
+    private availableHouses: string[] = ['0', '1', '2', '3'];
     private skinPreview: Phaser.GameObjects.Sprite;
     private buyButton: Phaser.GameObjects.Text;
     private availableSkins: string[] = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '15'];
-    private currentSkinIndex: number = 0;
-    private skinPrices: Map<string, number> = new Map();
-    private skinShopToggleButton: Phaser.GameObjects.Container;
 
+    private readonly INVENTORY_ROWS = 4;
+    private readonly INVENTORY_COLS = 5;
 
-    constructor(scene: Phaser.Scene, gridSize: number, player: Player) {
+    constructor(scene: Scene, player: Player) {
         this.scene = scene;
-        this.gridSize = gridSize;
         this.player = player;
-        this.inventoryContainer = this.scene.add.container(0, 0);
-        this.createGrid(player.sprite.x, player.sprite.y);
-        this.createSellArea();
+        this.initializeContainers();
+        this.createInventoryGrid();
+        this.createButtons();
         this.createMoneyDisplay();
-        this.fetchSkinPrices();
-        this.createSkinShop();
-        this.createToggleButton();
-        this.createSkinShopToggleButton();
-        this.close(); // Start with the inventory closed
+        this.createSellArea();
+        this.createShops();
+        this.fetchPrices();
+        this.setupEventListeners();
     }
 
-    createMoneyDisplay() {
-        this.moneyText = this.scene.add.text(0, 0, '$0', {fontSize: '24px', color: '#ffffff'});
-        this.moneyText.setOrigin(1, 0);
-        this.inventoryContainer.add(this.moneyText);
+    private initializeContainers(): void {
+        this.mainContainer = this.scene.add.container(8868, 7997);
+        this.inventoryContainer = this.scene.add.container(0, 0);
+        this.skinShopContainer = this.scene.add.container(0, 0);
+        this.houseShopContainer = this.scene.add.container(0, 0);
+
+        this.mainContainer.add([this.inventoryContainer, this.skinShopContainer, this.houseShopContainer]);
+        this.mainContainer.setDepth(1000);
     }
 
-    updateMoneyDisplay(amount: number) {
-        this.moneyText.setText(`$${amount}`);
-    }
+    private createInventoryGrid(): void {
+        const startX = this.scene.cameras.main.width / 2 - (this.INVENTORY_COLS * this.gridSize) / 2;
+        const startY = this.scene.cameras.main.height - (this.INVENTORY_ROWS * this.gridSize) - 10;
 
-    createToggleButton() {
-        const buttonWidth = 60;
-        const buttonHeight = 60;
-        const buttonRadius = 10;
-
-        // Create a rounded rectangle for the button background
-        const background = this.scene.add.graphics();
-        background.fillStyle(0x4a4a4a, 1);
-        background.fillRoundedRect(0, 0, buttonWidth, buttonHeight, buttonRadius);
-        background.lineStyle(2, 0xffffff, 1);
-        background.strokeRoundedRect(0, 0, buttonWidth, buttonHeight, buttonRadius);
-
-        // Create an icon for the button (you can replace this with an image if you prefer)
-        const icon = this.scene.add.text(buttonWidth / 2, buttonHeight / 2, '🎒', {
-            fontSize: '32px'
-        }).setOrigin(0.5);
-
-        // Create a container for the button
-        this.toggleButton = this.scene.add.container(0, 0, [background, icon]);
-        this.toggleButton.setSize(buttonWidth, buttonHeight);
-        this.toggleButton.setInteractive(new Phaser.Geom.Rectangle(30, 30, buttonWidth, buttonHeight), Phaser.Geom.Rectangle.Contains);
-
-        // Add touch event listener
-        // Add touch event listener
-        this.toggleButton.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
-            this.toggle();
-        });
-
-
-        // Ensure the button is always on top and visible
-        this.toggleButton.setDepth(1000);
-        this.toggleButton.setScrollFactor(0);
-
-        this.toggle();
-    }
-
-    createSkinShopToggleButton() {
-        const buttonWidth = 60;
-        const buttonHeight = 60;
-        const buttonRadius = 10;
-
-        // Create a rounded rectangle for the button background
-        const background = this.scene.add.graphics();
-        background.fillStyle(0x4a4a4a, 1);
-        background.fillRoundedRect(0, 0, buttonWidth, buttonHeight, buttonRadius);
-        background.lineStyle(2, 0xffffff, 1);
-        background.strokeRoundedRect(0, 0, buttonWidth, buttonHeight, buttonRadius);
-
-        // Create an icon for the button
-        const icon = this.scene.add.text(buttonWidth / 2, buttonHeight / 2, '👕', {
-            fontSize: '32px'
-        }).setOrigin(0.5);
-
-        // Create a container for the button
-        this.skinShopToggleButton = this.scene.add.container(0, 0, [background, icon]);
-        this.skinShopToggleButton.setSize(buttonWidth, buttonHeight);
-        this.skinShopToggleButton.setInteractive(new Phaser.Geom.Rectangle(30, 30, buttonWidth, buttonHeight), Phaser.Geom.Rectangle.Contains);
-
-        // Add touch event listener
-        this.skinShopToggleButton.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
-            this.toggleSkinShop();
-        });
-
-        // Ensure the button is always on top and visible
-        this.skinShopToggleButton.setDepth(1000);
-        this.skinShopToggleButton.setScrollFactor(0);
-
-        this.updateButtonPositions();
-    }
-
-
-    createGrid(startX: number, startY: number) {
-        for (let y = 0; y < 4; y++) {
-            for (let x = 0; x < 5; x++) {
-                const slotX = startX + (x * this.gridSize);
-                const slotY = startY + (y * this.gridSize);
-                const slot = this.scene.add.rectangle(slotX, slotY, this.gridSize, this.gridSize, 0x0000ff);
-                slot.setStrokeStyle(2, 0xffffff);
-                slot.setInteractive();
-                slot.setData('inventorySlot', true);
-                slot.setName(`inventorySlot_${y * 5 + x}`);
-
-                this.inventoryContainer.add(slot);
-                this.slots.push({x: slotX, y: slotY, occupied: false, item: null});
+        for (let row = 0; row < this.INVENTORY_ROWS; row++) {
+            for (let col = 0; col < this.INVENTORY_COLS; col++) {
+                const x = startX + col * this.gridSize;
+                const y = startY + row * this.gridSize;
+                const slot = new InventorySlot(this.scene, x, y, this.gridSize);
+                this.slots.push(slot);
+                this.inventoryContainer.add(slot.rectangle);
             }
         }
     }
 
-    isPointInInventory(x: number, y: number): boolean {
-        const camera = this.scene.cameras.main;
-        const inventoryBounds = new Phaser.Geom.Rectangle(
-            this.player.sprite.x - camera.width / 3,
-            this.player.sprite.y + 80,
-            this.gridSize * 5,
-            this.gridSize * 4
-        );
-        return inventoryBounds.contains(x, y);
+    private createButtons(): void {
+        this.toggleButton = this.createButton(0xadd8e6, '🎒', this.toggle.bind(this));
+        this.skinShopToggleButton = this.createButton(0xffa500, '👕', this.toggleSkinShop.bind(this));
+        this.houseShopToggleButton = this.createButton(0x90ee90, '🏠', this.toggleHouseShop.bind(this));
+
+        this.mainContainer.add([this.toggleButton, this.skinShopToggleButton, this.houseShopToggleButton]);
+        this.updateButtonPositions();
     }
 
-    isSellArea(x: number, y: number): boolean {
-        const sellArea = this.inventoryContainer.getByName('sellArea') as Phaser.GameObjects.Rectangle;
-        if (sellArea) {
-            return sellArea.getBounds().contains(x, y);
-        }
-        return false;
+    private createButton(color: number, icon: string, callback: () => void): Phaser.GameObjects.Container {
+        const button = this.scene.add.container(0, 0);
+        const bg = this.scene.add.rectangle(0, 0, 50, 50, color).setOrigin(0.5);
+        const text = this.scene.add.text(0, 0, icon, { fontSize: '24px' }).setOrigin(0.5);
+        button.add([bg, text]);
+        button.setSize(50, 50);
+        button.setInteractive({ useHandCursor: true })
+            .on('pointerdown', callback);
+        return button;
     }
 
-    addItemToFirstEmptySlot(item: Phaser.Physics.Arcade.Sprite) {
-        const existingSlot = this.slots.find(slot => slot === item.getData('inventorySlot'));
-        const emptySlot = existingSlot ? existingSlot : this.slots.find(slot => !slot.occupied);
+    private createMoneyDisplay(): void {
+        this.moneyText = this.scene.add.text(10, 10, '$0', { fontSize: '24px', color: '#ffffff' });
+        this.moneyText.setScrollFactor(0);
+        this.mainContainer.add(this.moneyText);
+    }
+
+    private createSellArea(): void {
+        const x = this.scene.cameras.main.width - this.gridSize - 10;
+        const y = this.scene.cameras.main.height - this.gridSize - 10;
+        this.sellArea = this.scene.add.rectangle(x, y, this.gridSize, this.gridSize, 0xff0000);
+        this.sellArea.setInteractive();
+        this.mainContainer.add(this.sellArea);
+    }
+
+    private createShops(): void {
+        // Implement skin and house shop creation here
+        // This would involve creating the necessary UI elements and adding them to the respective containers
+        this.fetchSkinPrices();
+        this.createSkinShop();
+
+        this.fetchHousePrices();
+        this.createHouseShop();
+    }
+
+    private fetchPrices(): void {
+        axios.get(`${environment.apiUrl}/skin-prices`)
+            .then(response => {
+                response.data.forEach((item: { skin_id: string, price: number }) => {
+                    this.skinPrices.set(item.skin_id, item.price);
+                });
+            })
+            .catch(error => console.error('Error fetching skin prices:', error));
+
+        axios.get(`${environment.apiUrl}/house-prices`)
+            .then(response => {
+                response.data.forEach((item: { house_id: string, price: number }) => {
+                    this.housePrices.set(item.house_id, item.price);
+                });
+            })
+            .catch(error => console.error('Error fetching house prices:', error));
+    }
+
+    private setupEventListeners(): void {
+        this.scene.scale.on('resize', this.handleResize, this);
+    }
+
+    private handleResize(): void {
+        this.updateButtonPositions();
+        this.updateInventoryPosition();
+        this.updateSellAreaPosition();
+    }
+
+    updateButtonPositions(): void {
+        const { width, height } = this.scene.cameras.main;
+        this.toggleButton.setPosition(width - 60, height - 60);
+        this.skinShopToggleButton.setPosition(width - 60, height - 120);
+        this.houseShopToggleButton.setPosition(width - 60, height - 180);
+    }
+
+    updateInventoryPosition(): void {
+        const { width, height } = this.scene.cameras.main;
+        const startX = width / 2 - (this.INVENTORY_COLS * this.gridSize) / 2;
+        const startY = height - (this.INVENTORY_ROWS * this.gridSize) - 10;
+
+        this.slots.forEach((slot, index) => {
+            const col = index % this.INVENTORY_COLS;
+            const row = Math.floor(index / this.INVENTORY_COLS);
+            slot.setPosition(startX + col * this.gridSize, startY + row * this.gridSize);
+        });
+    }
+
+    private updateSellAreaPosition(): void {
+        const { width, height } = this.scene.cameras.main;
+        this.sellArea.setPosition(width - this.gridSize - 10, height - this.gridSize - 10);
+    }
+
+    public toggle(): void {
+        this.isOpen = !this.isOpen;
+        this.inventoryContainer.setVisible(this.isOpen);
+        this.sellArea.setVisible(this.isOpen);
+    }
+
+    public toggleSkinShop(): void {
+        const isVisible = !this.skinShopContainer.visible;
+        this.skinShopContainer.setVisible(isVisible);
+        this.houseShopContainer.setVisible(false);
+        this.inventoryContainer.setVisible(false);
+        this.sellArea.setVisible(false);
+    }
+
+    public toggleHouseShop(): void {
+        const isVisible = !this.houseShopContainer.visible;
+        this.houseShopContainer.setVisible(isVisible);
+        this.skinShopContainer.setVisible(false);
+        this.inventoryContainer.setVisible(false);
+        this.sellArea.setVisible(false);
+    }
+
+    public updateMoneyDisplay(amount: number): void {
+        this.moneyText.setText(`$${amount}`);
+    }
+
+    public addItem(item: Phaser.GameObjects.Sprite): boolean {
+        const emptySlot = this.slots.find(slot => !slot.item);
         if (emptySlot) {
-            item.setPosition(emptySlot.x, emptySlot.y);
-            item.setImmovable(true);
-            emptySlot.occupied = true;
-            emptySlot.item = item;
-            item.setData('inventorySlot', emptySlot);
+            emptySlot.setItem(item);
             return true;
         }
         return false;
     }
 
-    createSellArea() {
-        const sellAreaX = this.player.sprite.x + (5 * this.gridSize) + 50;
-        const sellAreaY = this.player.sprite.y;
-        const sellArea = this.scene.add.rectangle(sellAreaX, sellAreaY, this.gridSize, this.gridSize, 0xff0000);
-        sellArea.setInteractive().setData('sellArea', true);
-        sellArea.setName('sellArea');
-        this.inventoryContainer.add(sellArea);
-    }
-
-    open() {
-        this.isOpen = true;
-        this.inventoryContainer.setVisible(true);
-        this.showInventoryItems();
-        this.moneyText.setVisible(true);
-    }
-
-    close() {
-        this.isOpen = false;
-        this.inventoryContainer.setVisible(false);
-        this.hideInventoryItems();
-        this.moneyText.setVisible(false);
-    }
-
-    showInventoryItems() {
-        this.slots.forEach(slot => {
-            if (slot.item) {
-                slot.item.setVisible(true);
-            }
-        });
-    }
-
-    hideInventoryItems() {
-        this.slots.forEach(slot => {
-            if (slot.item) {
-                slot.item.setVisible(false);
-            }
-        });
-    }
-
-    removeItemFromSlot(item: Phaser.Physics.Arcade.Sprite) {
-        const slot = this.slots.find(s => s.item === item);
+    public removeItem(item: Phaser.GameObjects.Sprite): void {
+        const slot = this.slots.find(slot => slot.item === item);
         if (slot) {
-            slot.occupied = false;
-            slot.item = null;
-            item.setData('inventorySlot', null);
+            slot.clearItem();
         }
     }
 
-    toggle() {
-        if (this.isOpen) {
-            this.close();
-        } else {
-            this.open();
-            this.skinShopContainer.setVisible(false);
-        }
+    public isPointInInventory(x: number, y: number): boolean {
+        return this.slots.some(slot => slot.contains(x, y));
     }
 
-    toggleSkinShop() {
-        if (this.skinShopContainer.visible) {
-            this.skinShopContainer.setVisible(false);
-        } else {
-            this.skinShopContainer.setVisible(true);
-            this.close();
-        }
-    }
-
-
-    updateButtonPositions() {
-        const camera = this.scene.cameras.main;
-        const inventoryButtonX = camera.width - 80;
-        const inventoryButtonY = camera.height - 80;
-        this.toggleButton.setPosition(inventoryButtonX, inventoryButtonY);
-
-        const skinShopButtonX = camera.width - 80;
-        const skinShopButtonY = camera.height - 150;
-        this.skinShopToggleButton.setPosition(skinShopButtonX, skinShopButtonY);
-    }
-
-
-    updatePosition(playerX: number, playerY: number) {
-        const camera = this.scene.cameras.main;
-        this.inventoryContainer.setPosition(playerX - camera.width / 3, playerY + 80);
-        this.skinShopContainer.setPosition(playerX - camera.width / 3, playerY + 80);
-        this.moneyText.setPosition(4 * this.gridSize, -70);
-        this.slots.forEach((slot, index) => {
-            const x = (index % 5) * this.gridSize;
-            const y = Math.floor(index / 5) * this.gridSize;
-            slot.x = x;
-            slot.y = y;
-
-            const rectangle = this.inventoryContainer.getByName(`inventorySlot_${index}`) as Phaser.GameObjects.Rectangle;
-            if (rectangle) {
-                rectangle.setPosition(x, y);
-            }
-
-            if (slot.item) {
-                slot.item.setPosition(playerX - camera.width / 3 + x, playerY + 80 + y);
-            }
-        });
-
-        // Update sell area position
-        const sellArea = this.inventoryContainer.getByName('sellArea') as Phaser.GameObjects.Rectangle;
-        if (sellArea) {
-            sellArea.setPosition((5 * this.gridSize), 0);
-        }
-        this.updateButtonPositions();
+    public isSellArea(x: number, y: number): boolean {
+        return this.sellArea.getBounds().contains(x, y);
     }
 
     createSkinShop() {
-        this.skinShopContainer = this.scene.add.container(0, 0);
+        this.skinShopContainer = this.scene.add.container(8868, 7997);
 
         const background = this.scene.add.rectangle(0, 0, this.gridSize * 3, this.gridSize * 4, 0x333333);
         background.setOrigin(0);
@@ -360,5 +306,113 @@ export class InventoryManager {
 
         // Update the preview
         this.skinPreview.setFrame(currentSkin);
+    }
+
+    createHouseShop() {
+        this.houseShopContainer = this.scene.add.container(8868, 7997);
+
+        const background = this.scene.add.rectangle(0, 0, this.gridSize * 4, this.gridSize * 5, 0x333333);
+        background.setOrigin(0);
+        this.houseShopContainer.add(background);
+
+        this.housePreview = this.scene.add.sprite(this.gridSize * 2, this.gridSize * 1.5, 'houses', this.availableHouses[0]);
+        this.houseShopContainer.add(this.housePreview);
+
+        const nextButton = this.scene.add.text(this.gridSize * 3, this.gridSize * 1.5, '>', { fontSize: '32px' })
+            .setInteractive()
+            .on('pointerdown', () => this.nextHouse());
+        this.houseShopContainer.add(nextButton);
+
+        const prevButton = this.scene.add.text(this.gridSize, this.gridSize * 1.5, '<', { fontSize: '32px' })
+            .setInteractive()
+            .on('pointerdown', () => this.prevHouse());
+        this.houseShopContainer.add(prevButton);
+
+        this.buyHouseButton = this.scene.add.text(this.gridSize * 2, this.gridSize * 3, 'Buy House', { fontSize: '24px' })
+            .setOrigin(0.5)
+            .setInteractive()
+            .on('pointerdown', () => this.buyHouse());
+        this.houseShopContainer.add(this.buyHouseButton);
+    }
+
+    nextHouse() {
+        this.currentHouseIndex = (this.currentHouseIndex + 1) % this.availableHouses.length;
+        this.updateHousePreview();
+    }
+
+    prevHouse() {
+        this.currentHouseIndex = (this.currentHouseIndex - 1 + this.availableHouses.length) % this.availableHouses.length;
+        this.updateHousePreview();
+    }
+
+    updateHousePreview() {
+        this.housePreview.setFrame(this.availableHouses[this.currentHouseIndex]);
+        const price = this.housePrices.get(this.availableHouses[this.currentHouseIndex]) || 0;
+        this.buyHouseButton.setText(`Buy for $${price}`);
+    }
+
+    buyHouse() {
+        const selectedHouse = this.availableHouses[this.currentHouseIndex];
+        const price = this.housePrices.get(selectedHouse) || 0;
+
+        axios.post(`${environment.apiUrl}/buy-house`, { houseId: selectedHouse }, {
+            headers: { Authorization: `Bearer ${(window as any).authToken}` }
+        })
+            .then(response => {
+                if (response.data.success) {
+                    this.updateMoneyDisplay(response.data.newBalance);
+                    this.scene.events.emit('housePurchased', selectedHouse, price);
+                } else {
+                    console.error('Failed to buy house:', response.data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Error buying house:', error);
+            });
+    }
+
+    async fetchHousePrices() {
+        try {
+            const response = await axios.get(`${environment.apiUrl}/house-prices`, {
+                headers: { Authorization: `Bearer ${(window as any).authToken}` }
+            });
+            response.data.forEach((item: { house_id: string, price: number }) => {
+                this.housePrices.set(item.house_id, item.price);
+            });
+            this.updateHousePreview();
+        } catch (error) {
+            console.error('Error fetching house prices:', error);
+        }
+    }
+}
+
+class InventorySlot {
+    public rectangle: Phaser.GameObjects.Rectangle;
+    public item: Phaser.GameObjects.Sprite | null = null;
+
+    constructor(scene: Scene, x: number, y: number, size: number) {
+        this.rectangle = scene.add.rectangle(x, y, size, size, 0x000000);
+        this.rectangle.setStrokeStyle(2, 0xffffff);
+        this.rectangle.setOrigin(0);
+    }
+
+    public setPosition(x: number, y: number): void {
+        this.rectangle.setPosition(x, y);
+        if (this.item) {
+            this.item.setPosition(x + this.rectangle.width / 2, y + this.rectangle.height / 2);
+        }
+    }
+
+    public setItem(item: Phaser.GameObjects.Sprite): void {
+        this.item = item;
+        item.setPosition(this.rectangle.x + this.rectangle.width / 2, this.rectangle.y + this.rectangle.height / 2);
+    }
+
+    public clearItem(): void {
+        this.item = null;
+    }
+
+    public contains(x: number, y: number): boolean {
+        return this.rectangle.getBounds().contains(x, y);
     }
 }
