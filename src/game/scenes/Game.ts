@@ -100,6 +100,7 @@ export class Game extends Scene {
     initializePlayer() {
         this.fetchInitialPlayerData().then(({x, y, skin}) => {
             this.player = new Player(this, x, y, 'player', skin);
+            this.physics.add.collider(this.player.sprite, this.houses);
 
             // Add colliders
             if (this.waterLayer) {
@@ -579,29 +580,53 @@ export class Game extends Scene {
         this.placingHouse = this.add.sprite(this.input.activePointer.worldX, this.input.activePointer.worldY, 'houses', houseFrame);
         this.placingHouse.setAlpha(0.7);
 
-        this.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
+        const moveListener = (pointer: Phaser.Input.Pointer) => {
             if (this.placingHouse) {
                 this.placingHouse.x = pointer.worldX;
                 this.placingHouse.y = pointer.worldY;
             }
-        });
+        };
 
-        this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+        const clickListener = (pointer: Phaser.Input.Pointer) => {
             if (this.placingHouse) {
-                // Check if the placement is valid (not colliding with other objects)
                 if (this.isValidPlacement(this.placingHouse.x, this.placingHouse.y)) {
                     this.confirmHousePlacement(houseFrame, this.placingHouse.x, this.placingHouse.y);
+                    // Remove listeners after placement
+                    this.input.off('pointermove', moveListener);
+                    this.input.off('pointerdown', clickListener);
                 } else {
                     console.log("Invalid placement");
                 }
             }
-        });
+        };
+
+        this.input.on('pointermove', moveListener);
+        this.input.on('pointerdown', clickListener);
     }
 
     isValidPlacement(x: number, y: number): boolean {
-        // Implement collision checking logic here
-        // Return true if the placement is valid, false otherwise
-        return true;
+        // Check if the new house overlaps with existing houses
+        let isValid = true;
+        this.houses.getChildren().forEach((house: Phaser.GameObjects.GameObject) => {
+            const houseSprite = house as Phaser.Physics.Arcade.Sprite;
+            if (Phaser.Geom.Intersects.RectangleToRectangle(
+                new Phaser.Geom.Rectangle(x - 32, y - 32, 64, 64),
+                houseSprite.getBounds()
+            )) {
+                isValid = false;
+            }
+        });
+
+        // Check if the new house is on water or trees
+        if (this.waterLayer && this.treeLayer) {
+            const tileX = this.waterLayer.worldToTileX(x);
+            const tileY = this.waterLayer.worldToTileY(y);
+            if (this.waterLayer.getTileAt(tileX, tileY) || this.treeLayer.getTileAt(tileX, tileY)) {
+                isValid = false;
+            }
+        }
+
+        return isValid;
     }
 
     confirmHousePlacement(houseFrame: string, x: number, y: number) {
@@ -610,11 +635,15 @@ export class Game extends Scene {
         })
             .then(response => {
                 if (response.data.success) {
-                    const house = this.houses.create(x, y, 'houses', houseFrame);
+                    const house = this.houses.create(x, y, 'houses', houseFrame) as Phaser.Physics.Arcade.Sprite;
                     house.setData('id', response.data.houseId);
-                    // @ts-ignore
-                    this.placingHouse.destroy();
-                    this.placingHouse = null;
+                    house.setImmovable(true);
+                    this.physics.add.collider(this.player.sprite, house);
+
+                    if (this.placingHouse) {
+                        this.placingHouse.destroy();
+                        this.placingHouse = null;
+                    }
                 } else {
                     console.error('Failed to place house:', response.data.message);
                 }
@@ -624,19 +653,23 @@ export class Game extends Scene {
             });
     }
 
-    async fetchAndRenderHouses() {
-        try {
-            const response = await axios.get(`${environment.apiUrl}/houses`, {
-                headers: { Authorization: `Bearer ${(window as any).authToken}` }
+    fetchAndRenderHouses() {
+        axios.get(`${environment.apiUrl}/houses`, {
+            headers: { Authorization: `Bearer ${(window as any).authToken}` }
+        })
+            .then(response => {
+                response.data.forEach((houseData: { id: string, x: number, y: number, frame: string }) => {
+                    const house = this.houses.create(houseData.x, houseData.y, 'houses', houseData.frame) as Phaser.Physics.Arcade.Sprite;
+                    house.setData('id', houseData.id);
+                    house.setImmovable(true);
+                    this.physics.add.collider(this.player.sprite, house);
+                });
+            })
+            .catch(error => {
+                console.error('Error fetching houses:', error);
             });
-            response.data.forEach((houseData: { id: string, x: number, y: number, frame: string }) => {
-                const house = this.houses.create(houseData.x, houseData.y, 'houses', houseData.frame);
-                house.setData('id', houseData.id);
-            });
-        } catch (error) {
-            console.error('Error fetching houses:', error);
-        }
     }
+
 
 }
 
