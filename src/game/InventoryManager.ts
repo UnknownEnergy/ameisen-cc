@@ -1,7 +1,8 @@
-import { Scene } from "phaser";
-import { Player } from "./Player";
+import {Scene} from "phaser";
+import {Player} from "./Player";
 import axios from "axios";
-import { environment } from "../environments/environment";
+import {environment} from "../environments/environment";
+import {Game} from "./scenes/Game";
 
 export class InventoryManager {
     private scene: Scene;
@@ -47,12 +48,17 @@ export class InventoryManager {
         this.createSellArea();
         this.createShops();
         this.fetchPrices();
-        this.setupEventListeners();
+
+        this.inventoryContainer.setVisible(false);
+        this.sellArea.setVisible(false);
+        this.houseShopContainer.setVisible(false);
+        this.skinShopContainer.setVisible(false);
+        this.moneyText.setVisible(false);
     }
 
     private initializeContainers(): void {
-        this.mainContainer = this.scene.add.container(8868, 7997);
-        this.inventoryContainer = this.scene.add.container(0, 0);
+        this.mainContainer = this.scene.add.container(this.player.sprite.x, this.player.sprite.y);
+        this.inventoryContainer = this.scene.add.container(0,0);
         this.skinShopContainer = this.scene.add.container(0, 0);
         this.houseShopContainer = this.scene.add.container(0, 0);
 
@@ -61,8 +67,8 @@ export class InventoryManager {
     }
 
     private createInventoryGrid(): void {
-        const startX = this.scene.cameras.main.width / 2 - (this.INVENTORY_COLS * this.gridSize) / 2;
-        const startY = this.scene.cameras.main.height - (this.INVENTORY_ROWS * this.gridSize) - 10;
+        const startX = 0;
+        const startY = 0;
 
         for (let row = 0; row < this.INVENTORY_ROWS; row++) {
             for (let col = 0; col < this.INVENTORY_COLS; col++) {
@@ -87,34 +93,30 @@ export class InventoryManager {
     private createButton(color: number, icon: string, callback: () => void): Phaser.GameObjects.Container {
         const button = this.scene.add.container(0, 0);
         const bg = this.scene.add.rectangle(0, 0, 50, 50, color).setOrigin(0.5);
-        const text = this.scene.add.text(0, 0, icon, { fontSize: '24px' }).setOrigin(0.5);
+        const text = this.scene.add.text(0, 0, icon, {fontSize: '24px'}).setOrigin(0.5);
         button.add([bg, text]);
         button.setSize(50, 50);
-        button.setInteractive({ useHandCursor: true })
+        button.setInteractive({useHandCursor: true})
             .on('pointerdown', callback);
         return button;
     }
 
     private createMoneyDisplay(): void {
-        this.moneyText = this.scene.add.text(10, 10, '$0', { fontSize: '24px', color: '#ffffff' });
+        this.moneyText = this.scene.add.text(  this.scene.cameras.main.width/this.scene.cameras.main.zoomX/2,0, '$0', {fontSize: '24px', color: '#ffffff'});
         this.moneyText.setScrollFactor(0);
-        this.mainContainer.add(this.moneyText);
     }
 
     private createSellArea(): void {
-        const x = this.scene.cameras.main.width - this.gridSize - 10;
-        const y = this.scene.cameras.main.height - this.gridSize - 10;
+        const x = this.scene.cameras.main.width/this.scene.cameras.main.zoomX/2.5;
+        const y = 0;
         this.sellArea = this.scene.add.rectangle(x, y, this.gridSize, this.gridSize, 0xff0000);
         this.sellArea.setInteractive();
         this.mainContainer.add(this.sellArea);
     }
 
     private createShops(): void {
-        // Implement skin and house shop creation here
-        // This would involve creating the necessary UI elements and adding them to the respective containers
         this.fetchSkinPrices();
         this.createSkinShop();
-
         this.fetchHousePrices();
         this.createHouseShop();
     }
@@ -137,27 +139,19 @@ export class InventoryManager {
             .catch(error => console.error('Error fetching house prices:', error));
     }
 
-    private setupEventListeners(): void {
-        this.scene.scale.on('resize', this.handleResize, this);
-    }
-
-    private handleResize(): void {
-        this.updateButtonPositions();
-        this.updateInventoryPosition();
-        this.updateSellAreaPosition();
-    }
-
     updateButtonPositions(): void {
-        const { width, height } = this.scene.cameras.main;
-        this.toggleButton.setPosition(width - 60, height - 60);
-        this.skinShopToggleButton.setPosition(width - 60, height - 120);
-        this.houseShopToggleButton.setPosition(width - 60, height - 180);
+        this.mainContainer.setPosition(this.player.sprite.x, this.player.sprite.y)
+        const x = this.scene.cameras.main.width/this.scene.cameras.main.zoomX/2;
+        const y = this.scene.cameras.main.height/this.scene.cameras.main.zoomY/2;
+        this.toggleButton.setPosition(x - 60, y - 60);
+        this.skinShopToggleButton.setPosition(x - 60, y - 120);
+        this.houseShopToggleButton.setPosition(x - 60, y - 180);
     }
 
     updateInventoryPosition(): void {
         const { width, height } = this.scene.cameras.main;
         const startX = width / 2 - (this.INVENTORY_COLS * this.gridSize) / 2;
-        const startY = height - (this.INVENTORY_ROWS * this.gridSize) - 10;
+        const startY = 0;
 
         this.slots.forEach((slot, index) => {
             const col = index % this.INVENTORY_COLS;
@@ -166,15 +160,13 @@ export class InventoryManager {
         });
     }
 
-    private updateSellAreaPosition(): void {
-        const { width, height } = this.scene.cameras.main;
-        this.sellArea.setPosition(width - this.gridSize - 10, height - this.gridSize - 10);
-    }
-
     public toggle(): void {
         this.isOpen = !this.isOpen;
+        this.skinShopContainer.setVisible(false);
+        this.houseShopContainer.setVisible(false);
         this.inventoryContainer.setVisible(this.isOpen);
         this.sellArea.setVisible(this.isOpen);
+        this.moneyText.setVisible(this.isOpen);
     }
 
     public toggleSkinShop(): void {
@@ -183,6 +175,7 @@ export class InventoryManager {
         this.houseShopContainer.setVisible(false);
         this.inventoryContainer.setVisible(false);
         this.sellArea.setVisible(false);
+        this.moneyText.setVisible(isVisible);
     }
 
     public toggleHouseShop(): void {
@@ -191,6 +184,7 @@ export class InventoryManager {
         this.skinShopContainer.setVisible(false);
         this.inventoryContainer.setVisible(false);
         this.sellArea.setVisible(false);
+        this.moneyText.setVisible(isVisible);
     }
 
     public updateMoneyDisplay(amount: number): void {
@@ -221,8 +215,13 @@ export class InventoryManager {
         return this.sellArea.getBounds().contains(x, y);
     }
 
+    updateShopPositions() {
+        this.skinShopContainer.setPosition(this.player.sprite.x-this.gridSize * 3/2, this.player.sprite.y);
+        this.houseShopContainer.setPosition(this.player.sprite.x-this.gridSize * 4/2, this.player.sprite.y);
+    }
+
     createSkinShop() {
-        this.skinShopContainer = this.scene.add.container(8868, 7997);
+        this.skinShopContainer = this.scene.add.container(this.player.sprite.x-this.gridSize * 3/2, this.player.sprite.y);
 
         const background = this.scene.add.rectangle(0, 0, this.gridSize * 3, this.gridSize * 4, 0x333333);
         background.setOrigin(0);
@@ -231,17 +230,17 @@ export class InventoryManager {
         this.skinPreview = this.scene.add.sprite(this.gridSize * 1.5, this.gridSize, 'player', this.availableSkins[0]);
         this.skinShopContainer.add(this.skinPreview);
 
-        const nextButton = this.scene.add.text(this.gridSize * 2.5, this.gridSize, '>', { fontSize: '32px' })
+        const nextButton = this.scene.add.text(this.gridSize * 2.5, this.gridSize, '>', {fontSize: '32px'})
             .setInteractive()
             .on('pointerdown', () => this.nextSkin());
         this.skinShopContainer.add(nextButton);
 
-        const prevButton = this.scene.add.text(this.gridSize * 0.5, this.gridSize, '<', { fontSize: '32px' })
+        const prevButton = this.scene.add.text(this.gridSize * 0.5, this.gridSize, '<', {fontSize: '32px'})
             .setInteractive()
             .on('pointerdown', () => this.prevSkin());
         this.skinShopContainer.add(prevButton);
 
-        this.buyButton = this.scene.add.text(this.gridSize * 1.5, this.gridSize * 3, `Buy now`, { fontSize: '24px' })
+        this.buyButton = this.scene.add.text(this.gridSize * 1.5, this.gridSize * 3, `Buy now`, {fontSize: '24px'})
             .setOrigin(0.5)
             .setInteractive()
             .on('pointerdown', () => this.buySkin());
@@ -267,8 +266,8 @@ export class InventoryManager {
     buySkin() {
         const selectedSkin = this.availableSkins[this.currentSkinIndex];
         // Call the server endpoint to buy the skin
-        axios.post(`${environment.apiUrl}/buy-skin`, { skinId: selectedSkin }, {
-            headers: { Authorization: `Bearer ${(window as any).authToken}` }
+        axios.post(`${environment.apiUrl}/buy-skin`, {skinId: selectedSkin}, {
+            headers: {Authorization: `Bearer ${(window as any).authToken}`}
         })
             .then(response => {
                 if (response.data.success) {
@@ -288,7 +287,7 @@ export class InventoryManager {
     async fetchSkinPrices() {
         try {
             const response = await axios.get(`${environment.apiUrl}/skin-prices`, {
-                headers: { Authorization: `Bearer ${(window as any).authToken}` }
+                headers: {Authorization: `Bearer ${(window as any).authToken}`}
             });
             response.data.forEach((item: { skin_id: string, price: number }) => {
                 this.skinPrices.set(item.skin_id, item.price);
@@ -309,7 +308,7 @@ export class InventoryManager {
     }
 
     createHouseShop() {
-        this.houseShopContainer = this.scene.add.container(8868, 7997);
+        this.houseShopContainer = this.scene.add.container(this.player.sprite.x-this.gridSize * 4/2, this.player.sprite.y);
 
         const background = this.scene.add.rectangle(0, 0, this.gridSize * 4, this.gridSize * 5, 0x333333);
         background.setOrigin(0);
@@ -318,17 +317,17 @@ export class InventoryManager {
         this.housePreview = this.scene.add.sprite(this.gridSize * 2, this.gridSize * 1.5, 'houses', this.availableHouses[0]);
         this.houseShopContainer.add(this.housePreview);
 
-        const nextButton = this.scene.add.text(this.gridSize * 3, this.gridSize * 1.5, '>', { fontSize: '32px' })
+        const nextButton = this.scene.add.text(this.gridSize * 3, this.gridSize * 1.5, '>', {fontSize: '32px'})
             .setInteractive()
             .on('pointerdown', () => this.nextHouse());
         this.houseShopContainer.add(nextButton);
 
-        const prevButton = this.scene.add.text(this.gridSize, this.gridSize * 1.5, '<', { fontSize: '32px' })
+        const prevButton = this.scene.add.text(this.gridSize, this.gridSize * 1.5, '<', {fontSize: '32px'})
             .setInteractive()
             .on('pointerdown', () => this.prevHouse());
         this.houseShopContainer.add(prevButton);
 
-        this.buyHouseButton = this.scene.add.text(this.gridSize * 2, this.gridSize * 3, 'Buy House', { fontSize: '24px' })
+        this.buyHouseButton = this.scene.add.text(this.gridSize * 2, this.gridSize * 3, 'Buy House', {fontSize: '24px'})
             .setOrigin(0.5)
             .setInteractive()
             .on('pointerdown', () => this.buyHouse());
@@ -355,8 +354,8 @@ export class InventoryManager {
         const selectedHouse = this.availableHouses[this.currentHouseIndex];
         const price = this.housePrices.get(selectedHouse) || 0;
 
-        axios.post(`${environment.apiUrl}/buy-house`, { houseId: selectedHouse }, {
-            headers: { Authorization: `Bearer ${(window as any).authToken}` }
+        axios.post(`${environment.apiUrl}/buy-house`, {houseId: selectedHouse}, {
+            headers: {Authorization: `Bearer ${(window as any).authToken}`}
         })
             .then(response => {
                 if (response.data.success) {
@@ -374,7 +373,7 @@ export class InventoryManager {
     async fetchHousePrices() {
         try {
             const response = await axios.get(`${environment.apiUrl}/house-prices`, {
-                headers: { Authorization: `Bearer ${(window as any).authToken}` }
+                headers: {Authorization: `Bearer ${(window as any).authToken}`}
             });
             response.data.forEach((item: { house_id: string, price: number }) => {
                 this.housePrices.set(item.house_id, item.price);

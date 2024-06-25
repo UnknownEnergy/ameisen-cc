@@ -42,13 +42,7 @@ export class Game extends Scene {
         });
 
         this.initializePlayer();
-        this.scale.on('resize', this.handleResize, this);
         EventBus.emit('current-scene-ready', this);
-    }
-
-    handleResize(gameSize: Phaser.Structs.Size) {
-        this.cameras.resize(gameSize.width, gameSize.height);
-        this.inventoryManager.updateButtonPositions();
     }
 
     createMap() {
@@ -268,6 +262,9 @@ export class Game extends Scene {
         this.handlePlayerMovement(delta);
         this.player?.update();
         this.updateOtherPlayers();
+        this.inventoryManager?.updateButtonPositions();
+        this.inventoryManager?.updateInventoryPosition();
+        this.inventoryManager?.updateShopPositions();
     }
 
     handlePlayerMovement(delta: number) {
