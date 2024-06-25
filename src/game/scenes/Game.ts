@@ -152,8 +152,6 @@ export class Game extends Scene {
 
     createInventory() {
         this.inventoryManager = new InventoryManager(this, this.player);
-        this.inventoryManager.updateButtonPositions();
-        this.inventoryManager.updateInventoryPosition();
     }
 
     createInputListeners() {
@@ -262,9 +260,6 @@ export class Game extends Scene {
         this.handlePlayerMovement(delta);
         this.player?.update();
         this.updateOtherPlayers();
-        this.inventoryManager?.updateButtonPositions();
-        this.inventoryManager?.updateInventoryPosition();
-        this.inventoryManager?.updateShopPositions();
     }
 
     handlePlayerMovement(delta: number) {
