@@ -198,13 +198,6 @@ export class Game extends Scene {
     private longPressDuration: number = 500;
 
     private onPointerDown(pointer: Phaser.Input.Pointer) {
-        // Check if the click is on a UI element
-        if (this.inventoryManager.isPointInInventory(pointer.x, pointer.y) ||
-            this.inventoryManager.isSellArea(pointer.x, pointer.y)) {
-            // Handle inventory interaction
-            return;
-        }
-
         // Handle world interaction
         if (this.player.sprite.getBounds().contains(pointer.worldX, pointer.worldY)) {
             this.pointerDownTime = this.time.now;
@@ -263,8 +256,16 @@ export class Game extends Scene {
     }
 
     handlePlayerMovement(delta: number) {
-        if (this.isDraggingItem) {
-            // If dragging an item, don't move the player
+        // Check if any UI element is open
+        const isUIOpen = this.inventoryManager?.isOpen ||
+            this.inventoryManager?.skinShopContainer?.visible ||
+            this.inventoryManager?.houseShopContainer?.visible;
+
+        // If UI is open or we're dragging an item, don't move the player
+        if (isUIOpen || this.isDraggingItem) {
+            // Stop the player's movement
+            // @ts-ignore
+            this.player.sprite.body.setVelocity(0);
             return;
         }
 
@@ -455,8 +456,8 @@ export class Game extends Scene {
 
         item.on('dragend', (pointer: any) => {
             this.isDraggingItem = false;
-            const droppedOnInventory = this.inventoryManager?.isPointInInventory(item.x, item.y);
-            const droppedOnSellArea = this.inventoryManager?.isSellArea(item.x, item.y);
+            const droppedOnInventory = this.inventoryManager?.isPointInInventory(pointer.x, pointer.y);
+            const droppedOnSellArea = this.inventoryManager?.isSellArea(pointer.x, pointer.y);
 
             if (droppedOnSellArea && this.inventoryManager?.isOpen) {
                 this.sellItem(item.getData('id'));

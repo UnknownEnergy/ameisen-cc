@@ -10,8 +10,8 @@ export class InventoryManager {
     private slots: InventorySlot[] = [];
     isOpen: boolean = false;
     private inventoryContainer: Phaser.GameObjects.Container;
-    private skinShopContainer: Phaser.GameObjects.Container;
-    private houseShopContainer: Phaser.GameObjects.Container;
+    skinShopContainer: Phaser.GameObjects.Container;
+    houseShopContainer: Phaser.GameObjects.Container;
 
     private moneyText: Phaser.GameObjects.Text;
     private toggleButton: Phaser.GameObjects.Container;
